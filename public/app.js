@@ -23,9 +23,14 @@
       const h = new URL(link).hostname.toLowerCase();
       if (/(^|\.)shopee\.com(\.br)?$|(^|\.)shope\.ee$/.test(h)) return 'Shopee';
       if (/(^|\.)mercadolivre\.com(\.br)?$|(^|\.)mercadolibre\.com$|(^|\.)meli\.la$/.test(h)) return 'Mercado Livre';
-      if (/(^|\.)tiktok\.com$|(^|\.)tiktokshop\.com$/.test(h)) return 'TikTok Shop';
+      if (/(^|\.)tiktok\.com$|(^|\.)tiktokshop\.com$|(^|\.)tiktokv\.com$/.test(h)) return 'TikTok Shop';
     } catch {}
     return '';
+  }
+  function syncPlatformFromLink() {
+    const p = platformForLink(el('ad-url').value.trim());
+    if (p) el('f-platform').value = p;
+    return p;
   }
   function buildMessage() {
     const platform = el('f-platform').value;
@@ -51,6 +56,8 @@
   async function fetchPreview() {
     const url = el('ad-url').value.trim();
     if (!url) return toast('Cole o link do anúncio.', true);
+    syncPlatformFromLink();
+    buildMessage();
     const btn = el('fetch-btn');
     btn.disabled = true; btn.textContent = 'Buscando…';
     el('fetch-status').className = 'assist-message';
@@ -72,6 +79,8 @@
       toast(d.price != null ? 'Dados puxados. Revise e replique.' : 'Sem preço confirmado — complete manualmente.', d.price == null);
     } catch (e) {
       el('f-link').value = el('f-link').value || url;
+      syncPlatformFromLink();
+      buildMessage();
       el('fetch-status').className = 'assist-message error';
       el('fetch-status').textContent = (e.message || 'Falha.') + ' Preencha manualmente.';
       toast('A loja não liberou os dados.', true);
@@ -156,6 +165,7 @@
   }));
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link'].forEach(id => el(id).addEventListener('input', buildMessage));
   el('fetch-btn').addEventListener('click', fetchPreview);
+  el('ad-url').addEventListener('input', syncPlatformFromLink);
   el('ad-url').addEventListener('keydown', e => { if (e.key === 'Enter') fetchPreview(); });
   el('build-btn').addEventListener('click', () => { buildMessage(); toast('Mensagem pronta.'); document.getElementById('step-mensagem').scrollIntoView({behavior: 'smooth'}); });
   el('copy-btn').addEventListener('click', copyText);
