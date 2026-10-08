@@ -1,6 +1,3 @@
-databases:
-  - name: central-db
-    plan: free
 services:
   - type: web
     name: central-achadinhos
@@ -14,7 +11,3 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22.16.0
-      - key: DATABASE_URL
-        fromDatabase:
-          name: central-db
-          property: connectionString
