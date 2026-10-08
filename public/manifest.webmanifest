@@ -1,0 +1,9 @@
+{
+  "name": "Central de Achadinhos",
+  "short_name": "Achadinhos",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#101d2d",
+  "background_color": "#f6f8fa",
+  "icons": []
+}

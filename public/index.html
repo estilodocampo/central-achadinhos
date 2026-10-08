@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101d2d">
+  <meta name="description" content="Organize produtos e crie postagens para divulgar ofertas de afiliados em grupos e canais.">
+  <title>Central de Achadinhos • Painel</title>
+  
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-icon">✦</div><div><strong>Central de<br>Achadinhos</strong><span>GESTOR DE OFERTAS</span></div></div>
+    <div class="nav-caption">PAINEL</div>
+    <nav class="side-nav" aria-label="Menu principal">
+      <button class="nav-btn active" data-view="inicio"><span class="nav-emoji">◫</span> Visão geral</button>
+      <button class="nav-btn" data-view="ofertas"><span class="nav-emoji">▣</span> Minhas ofertas</button>
+      <button class="nav-btn" data-view="nova"><span class="nav-emoji">＋</span> Nova oferta</button>
+      <button class="nav-btn" data-view="publicacoes"><span class="nav-emoji">↗</span> Publicações</button>
+      <button class="nav-btn" data-view="config"><span class="nav-emoji">⚙</span> Configurações</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Versão gratuita <span class="ver">v1.0.4</span><p>Seu catálogo é salvo neste navegador. Faça backups regularmente.</p></div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="breadcrumb">CENTRAL <span>/</span> <strong id="current-section">Visão geral</strong></div>
+      <div class="top-actions"><span class="top-date" id="today-label"></span><button type="button" class="btn btn-primary btn-sm" data-action="new-offer">+ Nova oferta</button></div>
+    </header>
+
+    <section class="view" id="view-inicio">
+      <div class="hero">
+        <div class="hero-copy"><div class="eyebrow"><span class="live-dot"></span> SEU NEGÓCIO, ORGANIZADO</div><h1>Mais organização.<br><em>Mais oportunidades.</em></h1><p>Cadastre os achadinhos, gere mensagens de venda e compartilhe nos seus grupos e canais do WhatsApp.</p><div class="hero-actions"><button type="button" class="btn btn-light" data-action="new-offer">+ Cadastrar oferta</button><button type="button" class="btn btn-ghost-light" data-view="publicacoes">Preparar publicações →</button></div></div>
+        <div class="hero-illustration" aria-hidden="true"><div class="bubble b1">✦</div><div class="bag">🛍️</div><div class="badge-floating">OFERTAS<br><b>VIP</b></div><div class="bubble b2">%</div></div>
+      </div>
+      <div class="section-head"><div><h2>Resumo da operação</h2><p>Indicadores do seu catálogo neste dispositivo</p></div></div>
+      <div class="metrics" id="metrics"></div>
+      <div class="dashboard-grid">
+        <div class="panel"><div class="panel-head"><div><h3>Últimas ofertas</h3><p>Produtos adicionados recentemente</p></div><button type="button" class="text-link" data-view="ofertas">Ver todas →</button></div><div id="recent-offers"></div></div>
+        <div class="panel panel-tips"><div class="panel-head"><div><h3>Comece por aqui</h3><p>Seu fluxo de publicação</p></div></div><div class="step"><span>01</span><div><b>Cadastre um produto</b><p>Informe link, preço real e foto do anúncio.</p></div></div><div class="step"><span>02</span><div><b>Revise o preço</b><p>Confira a oferta antes de compartilhar.</p></div></div><div class="step"><span>03</span><div><b>Publique no WhatsApp</b><p>Copie a mensagem ou abra o compartilhamento.</p></div></div><div class="info-note">ℹ️ Publicação em grupos e canais requer ação manual nesta versão.</div></div>
+      </div>
+    </section>
+
+    <section class="view hidden" id="view-ofertas">
+      <div class="section-head larger"><div><div class="eyebrow dark">GERENCIAMENTO</div><h1 class="page-heading">Minhas ofertas</h1><p>Produtos cadastrados para divulgação</p></div><button type="button" class="btn btn-primary" data-action="new-offer">+ Adicionar produto</button></div>
+      <div class="filters"><label class="search-wrap">⌕ <input type="search" id="offer-search" placeholder="Buscar produto, categoria ou cupom…" aria-label="Buscar ofertas"></label><select id="platform-filter" aria-label="Filtrar plataforma"><option value="">Todas as plataformas</option><option value="Shopee">Shopee</option><option value="Mercado Livre">Mercado Livre</option><option value="TikTok Shop">TikTok Shop</option></select><select id="status-filter" aria-label="Filtrar status"><option value="">Todos os status</option><option value="rascunho">Rascunho</option><option value="pronta">Pronta</option><option value="publicada">Publicada</option></select></div>
+      <div id="offer-grid" class="offer-grid"></div>
+    </section>
+
+    <section class="view hidden" id="view-nova">
+      <div class="section-head larger"><div><div class="eyebrow dark">CADASTRO</div><h1 class="page-heading" id="form-title">Adicionar oferta</h1><p>Uma oferta completa em poucos passos</p></div><button type="button" class="btn btn-outline" data-view="ofertas">← Ver ofertas</button></div>
+      <div class="editor-layout"><form id="offer-form" class="panel form-panel" novalidate>
+        <div class="import-box"><div><h3>🔗 Importar por link</h3><p>Cole o link para importar automaticamente título, foto, preço e categoria disponíveis.</p></div><div class="import-inline"><input type="url" id="preview-url" placeholder="Cole o link da Shopee, Mercado Livre ou TikTok" autocomplete="url"><button type="button" id="preview-button" class="btn btn-dark">Buscar dados</button></div><span class="assist-message" id="preview-status" role="status">Cole um link de afiliado. A busca começa automaticamente. Confira os preços antes de publicar.</span><div id="lookup-wrap" class="hidden" style="margin-top:13px;padding-top:12px;border-top:1px solid #dfe8f0">
+          <label class="field" for="lookup-url"><span>URL original do anúncio <small>caso o link curto não mostre o preço</small></span>
+          <input id="lookup-url" type="url" placeholder="https://produto.mercadolivre.com.br/MLB-... ou /p/MLB..." autocomplete="url">
+          <small>Usada apenas para consultar os dados. Seu link de afiliado será preservado.</small></label>
+          <button type="button" class="btn btn-outline" id="lookup-button">Consultar pelo anúncio original</button>
+        </div></div>
+        <div class="form-section-title">Detalhes do produto</div>
+        <div class="form-row"><label class="field"><span>Plataforma <i>*</i></span><select id="form-platform" required><option>Shopee</option><option>Mercado Livre</option><option>TikTok Shop</option></select></label><label class="field"><span>Categoria</span><input id="form-category" list="category-options" maxlength="60" placeholder="Ex.: Moda, Casa, Eletrônicos" autocomplete="off"><datalist id="category-options"></datalist><small id="category-count">Categorias iguais serão reutilizadas, sem duplicar.</small></label></div>
+        <label class="field"><span>Nome do produto <i>*</i></span><input id="form-title-input" maxlength="180" required placeholder="Ex.: Kit 3 camisetas femininas"></label>
+        <div class="form-row"><label class="field"><span>Preço atual (R$) <i>*</i></span><input id="form-price" inputmode="decimal" maxlength="16" required placeholder="Ex.: 49,90"></label><label class="field"><span>Preço anterior (R$) <small>opcional</small></span><input id="form-old-price" inputmode="decimal" maxlength="16" placeholder="Ex.: 79,90"></label></div>
+        <div class="form-row"><label class="field"><span>Cupom <small>opcional</small></span><input id="form-coupon" maxlength="70" placeholder="Ex.: CUPOM10"></label><label class="field"><span>Status</span><select id="form-status"><option value="rascunho">Rascunho</option><option value="pronta" selected>Pronta para divulgar</option><option value="publicada">Já publicada</option></select></label></div>
+        <label class="field"><span>Link do produto / seu link de afiliado <i>*</i></span><input id="form-link" type="url" required autocomplete="url" placeholder="https://..."><small>Use seu próprio link de afiliado. Ele será mantido sem alterações.</small></label>
+        <label class="field"><span>URL da foto do produto</span><input id="form-image" type="url" autocomplete="url" placeholder="https://...imagem.jpg"><small>Use um link público HTTPS da imagem ou deixe em branco.</small></label>
+        <div class="form-footer"><button type="button" class="btn btn-outline" data-action="cancel-edit">Cancelar</button><button type="submit" class="btn btn-primary" id="save-offer">Salvar oferta</button></div>
+      </form><div class="preview-column"><div class="panel product-preview"><h3>Prévia do anúncio</h3><p>Como seu produto aparecerá no painel</p><div class="product-image-preview" id="live-image"><span>🛍️</span></div><div class="live-platform" id="live-platform">Shopee</div><h4 id="live-title">Nome do produto</h4><div class="live-price" id="live-price">Preço não informado</div><p class="live-hint">O preço deve ser o valor real confirmado na loja.</p></div><div class="info-note standalone">🔒 Dados salvos apenas neste navegador. Use Configurações para exportar um backup.</div></div></div>
+    </section>
+
+    <section class="view hidden" id="view-publicacoes">
+      <div class="section-head larger"><div><div class="eyebrow dark">COMUNICAÇÃO</div><h1 class="page-heading">Publicações</h1><p>Mensagens prontas para compartilhar sem inventar preços</p></div><button type="button" class="btn btn-primary" data-action="new-offer">+ Nova oferta</button></div>
+      <div class="publish-layout"><div class="panel"><div class="panel-head"><div><h3>Escolha uma oferta</h3><p>Selecione um produto para gerar a mensagem</p></div></div><div id="publish-list" class="publish-list"></div></div><div class="panel composer"><div class="panel-head"><div><h3>Mensagem de divulgação</h3><p>Revise antes de enviar aos seus seguidores</p></div></div><textarea readonly id="post-message" rows="13" aria-label="Mensagem de divulgação"></textarea><div class="composer-actions"><button id="copy-post" type="button" class="btn btn-primary">Copiar mensagem</button><button id="share-whatsapp" type="button" class="btn btn-whatsapp">Compartilhar no WhatsApp ↗</button></div><p class="tiny-warning">Ao abrir o WhatsApp, escolha manualmente o grupo. Para publicar em um canal, copie e cole a mensagem. Nenhuma publicação ocorre automaticamente.</p><button type="button" id="mark-published" class="btn btn-outline btn-full">✓ Marcar como publicada</button></div></div>
+    </section>
+
+    <section class="view hidden" id="view-config">
+      <div class="section-head larger"><div><div class="eyebrow dark">PREFERÊNCIAS</div><h1 class="page-heading">Configurações</h1><p>Links da comunidade e cópia de segurança</p></div></div>
+      <div class="config-layout">
+      <div class="panel settings-panel" style="grid-column:1/-1" aria-label="Integração Mercado Livre">
+        <div class="panel-head"><div><h3>🔐 Mercado Livre — conexão oficial</h3>
+        <p>Autorize o aplicativo para consultar preços com segurança, sem copiar tokens manualmente.</p></div></div>
+        <p id="ml-oauth-status" class="assist-message" role="status">Verificando integração…</p>
+        <p class="tiny-warning">O acesso fica protegido neste navegador. Em outro dispositivo, será necessário conectar novamente.</p>
+        <div class="composer-actions">
+          <button type="button" id="ml-connect" class="btn btn-primary" disabled>Conectar Mercado Livre</button>
+          <button type="button" id="ml-disconnect" class="btn btn-outline" disabled>Desconectar</button>
+        </div>
+        <div class="info-note standalone">URL de retorno: <code>https://central-achadinhos.onrender.com/api/ml/callback</code></div>
+      </div>
+      <form class="panel settings-panel" id="settings-form"><div class="panel-head"><div><h3>Sua comunidade</h3><p>Use seus links para atrair novos participantes</p></div></div><label class="field"><span>Nome da comunidade</span><input id="setting-name" maxlength="100" placeholder="Achadinhos VIP | Ofertas do Dia"></label><label class="field"><span>Link de convite do grupo</span><input type="url" id="setting-group" placeholder="https://chat.whatsapp.com/..."></label><label class="field"><span>Link do canal</span><input type="url" id="setting-channel" placeholder="https://whatsapp.com/channel/..."></label><label class="field"><span>Texto de convite</span><textarea id="setting-invite" rows="3" maxlength="500" placeholder="Venha receber as melhores ofertas!"></textarea></label><button type="submit" class="btn btn-primary">Salvar configurações</button><button type="button" class="btn btn-outline" id="copy-invite">Copiar convite do grupo</button></form>
+      <div class="panel settings-panel"><div class="panel-head"><div><h3>Seus dados</h3><p>Controle de informações e backups</p></div></div><div class="backup-item"><span class="backup-icon">↓</span><div><b>Exportar backup JSON</b><p>Salva suas ofertas e configurações em arquivo.</p></div><button type="button" class="btn btn-outline" id="export-json">Exportar</button></div><div class="backup-item"><span class="backup-icon">▤</span><div><b>Exportar planilha CSV</b><p>Lista suas ofertas para conferência.</p></div><button type="button" class="btn btn-outline" id="export-csv">Exportar</button></div><div class="backup-item"><span class="backup-icon">↑</span><div><b>Restaurar backup JSON</b><p>Substitui as ofertas e configurações atuais.</p></div><button type="button" class="btn btn-outline" id="import-json-button">Importar</button><input type="file" id="import-json" accept=".json,application/json" hidden></div><div class="info-note standalone">Dados ficam no armazenamento do navegador deste dispositivo. Limpar os dados do navegador pode apagá-los. O backup permite restaurar seus cadastros.</div></div></div>
+    </section>
+    <footer class="footer">Central de Achadinhos <b>v1.0</b> <span>•</span> Painel independente. Não afiliado às plataformas.</footer>
+  </main>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div class="modal-backdrop hidden" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-box"><h3 id="modal-title">Excluir oferta?</h3><p id="modal-description">Esta ação não pode ser desfeita.</p><div class="modal-buttons"><button type="button" class="btn btn-outline" id="modal-cancel">Cancelar</button><button type="button" class="btn btn-danger" id="modal-confirm">Excluir</button></div></div></div>
+<script src="./app.js"></script>
+</body>
+</html>
