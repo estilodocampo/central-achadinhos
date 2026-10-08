@@ -21,7 +21,7 @@
       <button class="nav-btn" data-view="publicacoes"><span class="nav-emoji">↗</span> Publicações</button>
       <button class="nav-btn" data-view="config"><span class="nav-emoji">⚙</span> Configurações</button>
     </nav>
-    <div class="sidebar-bottom"><span class="online-dot"></span> Versão multi-device <span class="ver">v1.1.0</span><p>Sync automático no servidor + backup local. Faça login em Configurações.</p></div>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Versão multi-device <span class="ver">v1.2.0</span><p>Postgres persistente + sync automático. Faça login em Configurações.</p></div>
   </aside>
 
   <main class="main-content">
@@ -104,7 +104,7 @@
       <form class="panel settings-panel" id="settings-form"><div class="panel-head"><div><h3>Sua comunidade</h3><p>Use seus links para atrair novos participantes</p></div></div><label class="field"><span>Nome da comunidade</span><input id="setting-name" maxlength="100" placeholder="Achadinhos VIP | Ofertas do Dia"></label><label class="field"><span>Link de convite do grupo</span><input type="url" id="setting-group" placeholder="https://chat.whatsapp.com/..."></label><label class="field"><span>Link do canal</span><input type="url" id="setting-channel" placeholder="https://whatsapp.com/channel/..."></label><label class="field"><span>Texto de convite</span><textarea id="setting-invite" rows="3" maxlength="500" placeholder="Venha receber as melhores ofertas!"></textarea></label><button type="submit" class="btn btn-primary">Salvar configurações</button><button type="button" class="btn btn-outline" id="copy-invite">Copiar convite do grupo</button></form>
       <div class="panel settings-panel"><div class="panel-head"><div><h3>Seus dados</h3><p>Controle de informações e backups</p></div></div><div class="backup-item"><span class="backup-icon">↓</span><div><b>Exportar backup JSON</b><p>Salva suas ofertas e configurações em arquivo.</p></div><button type="button" class="btn btn-outline" id="export-json">Exportar</button></div><div class="backup-item"><span class="backup-icon">▤</span><div><b>Exportar planilha CSV</b><p>Lista suas ofertas para conferência.</p></div><button type="button" class="btn btn-outline" id="export-csv">Exportar</button></div><div class="backup-item"><span class="backup-icon">↑</span><div><b>Restaurar backup JSON</b><p>Substitui as ofertas e configurações atuais.</p></div><button type="button" class="btn btn-outline" id="import-json-button">Importar</button><input type="file" id="import-json" accept=".json,application/json" hidden></div><div class="info-note standalone">Logado: salva no servidor (SQLite) e espelha neste navegador. Deslogado: só navegador. Limpar dados do navegador apaga a cópia local.</div></div></div>
     </section>
-    <footer class="footer">Central de Achadinhos <b>v1.1</b> <span>•</span> Painel independente. Não afiliado às plataformas.</footer>
+    <footer class="footer">Central de Achadinhos <b>v1.2</b> <span>•</span> Painel independente. Não afiliado às plataformas.</footer>
   </main>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

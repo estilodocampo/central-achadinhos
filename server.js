@@ -6,14 +6,14 @@
   const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,ML_REDIRECT_URI,resolveRedirectUri } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct} = await import('./shopee-affiliate.js');
-  const { listOffers,getOffer,upsertOffer,deleteOffer,getSettings,saveSettings,listUsers,dbMode } = await import('./db.js');
+  const { listOffers,getOffer,upsertOffer,deleteOffer,getSettings,saveSettings,dbMode } = await import('./db.js');
   const { registerUser,verifyUser,issueSession,readSession,sessionCookie,clearSessionCookieLocal,destroySession,userCount } = await import('./auth-local.js');
   const { readFile, stat } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
   const PLATFORMS=['Shopee','Mercado Livre','TikTok Shop'];
   function marketUrl(input) {
@@ -176,14 +176,14 @@
     const rhs=createHash('sha256').update(adminPassword,'utf8').digest();
     return timingSafeEqual(lhs,rhs);
   }
-  function currentOwner(req){
+  async function currentOwner(req){
     try{
-      const sess=readSession(req.headers.cookie);
+      const sess=await readSession(req.headers.cookie);
       if(sess?.username)return String(sess.username).toLowerCase();
     }catch{}
     if(authorized(req))return 'admin';
     try{
-      if(!adminPassword&&userCount()===0)return 'public';
+      if(!adminPassword&&(await userCount())===0)return 'public';
     }catch{}
     return null;
   }
@@ -222,24 +222,24 @@
       const path=parsed.pathname;
       if(protectedAPIs && path !== '/health' && path !== '/api/ml/callback' && !PUBLIC_AUTH_PATHS.has(path)) {
         if(!adminPassword)return send(res,503,{error:'Antes de ativar as APIs, configure CENTRAL_ADMIN_PASSWORD no Render.'});
-        if(!authorized(req)&&!readSession(req.headers.cookie))return needBasic(res);
+        if(!authorized(req)&&!(await readSession(req.headers.cookie)))return needBasic(res);
       }
       if(path==='/health')return send(res,200,{ok:true,version:VERSION,db:dbMode()});
       if(path==='/api/auth/me'){
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
-        const sess=readSession(req.headers.cookie);
-        const owner=currentOwner(req);
+        const sess=await readSession(req.headers.cookie);
+        const owner=await currentOwner(req);
         return send(res,200,{user:sess?.username||(authorized(req)?'admin':null),owner:owner||null,
-          users:userCount(),adminProtected:Boolean(adminPassword),protectedAPIs});
+          users:await userCount(),adminProtected:Boolean(adminPassword),protectedAPIs});
       }
       if(path==='/api/auth/register'){
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
         let body;
         try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
         try{
-          if(userCount()>0&&!currentOwner(req))return send(res,401,{error:'Faça login para criar usuários.'});
-          const created=registerUser(body.username,body.password);
-          const sess=issueSession(created.username);
+          if((await userCount())>0&&!(await currentOwner(req)))return send(res,401,{error:'Faça login para criar usuários.'});
+          const created=await registerUser(body.username,body.password);
+          const sess=await issueSession(created.username);
           return send(res,201,{ok:true,user:created.username},'application/json; charset=utf-8',false,{'set-cookie':sessionCookie(sess.token)});
         }catch(e){return send(res,400,{error:e?.message||'Não foi possível registrar.'});}
       }
@@ -247,53 +247,53 @@
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
         let body;
         try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
-        const ok=verifyUser(body.username,body.password);
+        const ok=await verifyUser(body.username,body.password);
         if(!ok){
           if(adminPassword&&String(body.username||'').toLowerCase()==='admin'){
             const lhs=createHash('sha256').update(String(body.password||''),'utf8').digest();
             const rhs=createHash('sha256').update(adminPassword,'utf8').digest();
             if(lhs.length===rhs.length&&timingSafeEqual(lhs,rhs)){
-              const sess=issueSession('admin');
+              const sess=await issueSession('admin');
               return send(res,200,{ok:true,user:'admin'},'application/json; charset=utf-8',false,{'set-cookie':sessionCookie(sess.token)});
             }
           }
           return send(res,401,{error:'Usuário ou senha inválidos.'});
         }
-        const sess=issueSession(ok.username);
+        const sess=await issueSession(ok.username);
         return send(res,200,{ok:true,user:ok.username},'application/json; charset=utf-8',false,{'set-cookie':sessionCookie(sess.token)});
       }
       if(path==='/api/auth/logout'){
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
-        destroySession(req.headers.cookie);
+        await destroySession(req.headers.cookie);
         return send(res,200,{ok:true},'application/json; charset=utf-8',false,{'set-cookie':clearSessionCookieLocal()});
       }
       if(path==='/api/offers'&&req.method==='GET'){
-        const owner=currentOwner(req);
+        const owner=await currentOwner(req);
         if(!owner)return send(res,401,{error:'Faça login.'});
-        return send(res,200,{offers:listOffers(owner),owner});
+        return send(res,200,{offers:await listOffers(owner),owner});
       }
       if(path==='/api/offers'&&req.method==='POST'){
-        const owner=currentOwner(req);
+        const owner=await currentOwner(req);
         if(!owner)return send(res,401,{error:'Faça login.'});
         let body;
         try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
         const clean=validOfferInput(body);
         if(!clean)return send(res,400,{error:'Oferta inválida.'});
-        if(countGuard(owner))return send(res,413,{error:'Limite de 3000 ofertas.'});
-        return send(res,201,{offer:upsertOffer(clean,owner)});
+        if(await countGuard(owner))return send(res,413,{error:'Limite de 3000 ofertas.'});
+        return send(res,201,{offer:await upsertOffer(clean,owner)});
       }
       if(path.startsWith('/api/offers/')&&(req.method==='PUT'||req.method==='DELETE'||req.method==='GET')){
-        const owner=currentOwner(req);
+        const owner=await currentOwner(req);
         if(!owner)return send(res,401,{error:'Faça login.'});
         const id=decodeURIComponent(path.slice('/api/offers/'.length).split('/')[0]||'');
         if(!id)return send(res,400,{error:'ID inválido.'});
         if(req.method==='DELETE'){
-          const ok=deleteOffer(id,owner);
+          const ok=await deleteOffer(id,owner);
           if(!ok)return send(res,404,{error:'Oferta não encontrada.'});
           return send(res,200,{ok:true});
         }
         if(req.method==='GET'){
-          const o=getOffer(id,owner);
+          const o=await getOffer(id,owner);
           if(!o)return send(res,404,{error:'Oferta não encontrada.'});
           return send(res,200,{offer:o});
         }
@@ -302,19 +302,19 @@
         body.id=id;
         const clean=validOfferInput(body);
         if(!clean)return send(res,400,{error:'Oferta inválida.'});
-        return send(res,200,{offer:upsertOffer(clean,owner)});
+        return send(res,200,{offer:await upsertOffer(clean,owner)});
       }
       if(path==='/api/settings'&&req.method==='GET'){
-        const owner=currentOwner(req);
+        const owner=await currentOwner(req);
         if(!owner)return send(res,401,{error:'Faça login.'});
-        return send(res,200,{settings:getSettings(owner),owner});
+        return send(res,200,{settings:await getSettings(owner),owner});
       }
       if(path==='/api/settings'&&(req.method==='PUT'||req.method==='POST')){
-        const owner=currentOwner(req);
+        const owner=await currentOwner(req);
         if(!owner)return send(res,401,{error:'Faça login.'});
         let body;
         try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
-        return send(res,200,{settings:saveSettings(body?.settings||body,owner)});
+        return send(res,200,{settings:await saveSettings(body?.settings||body,owner)});
       }
       if(path==='/api/ml/status'){
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
@@ -358,7 +358,7 @@
         mercadoLivre:{configured:Boolean(process.env.ML_CLIENT_ID&&process.env.ML_CLIENT_SECRET),connected:sessionStatus(req.headers.cookie).connected},
         shopee:{appIdConfigured:Boolean(process.env.SHOPEE_APP_ID),appSecretConfigured:Boolean(process.env.SHOPEE_APP_SECRET)},
         accessProtected:protectedAPIs && Boolean(adminPassword),
-        users:userCount(),db:dbMode()
+        users:await userCount(),db:dbMode()
       });
       if(path==='/api/preview'){
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
@@ -380,16 +380,15 @@
       return send(res,200,file,MIMES[extname(target)]||'application/octet-stream',req.method==='HEAD');
     }catch{return send(res,500,{error:'Erro interno.'});}
   });
-  function countGuard(owner){
+  async function countGuard(owner){
     try{
-      const {countOffers}=esmCountHack;
-      return countOffers(owner)>=3000;
+      const {countOffers}=await import('./db.js');
+      return (await countOffers(owner))>=3000;
     }catch{return false;}
   }
-  const esmCountHack=await import('./db.js');
-  server.listen(PORT,'0.0.0.0',()=>{
+  server.listen(PORT,'0.0.0.0',async()=>{
     console.log('Central de Achadinhos '+VERSION+' na porta '+PORT);
-    console.log('DB='+dbMode()+', users='+userCount()+', MLApp='+Boolean(process.env.ML_CLIENT_ID&&process.env.ML_CLIENT_SECRET)+
+    console.log('DB='+dbMode()+', users='+(await userCount())+', MLApp='+Boolean(process.env.ML_CLIENT_ID&&process.env.ML_CLIENT_SECRET)+
       ', ShopeeID='+Boolean(process.env.SHOPEE_APP_ID)+
       ', ShopeeSecret='+Boolean(process.env.SHOPEE_APP_SECRET)+
       ', SenhaAdmin='+Boolean(adminPassword));

@@ -1,46 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {__forceMemory,upsertOffer,listOffers,getOffer,deleteOffer,getSettings,saveSettings,insertUser,listUsers} from './db.js';
+import {__forceMemory,upsertOffer,listOffers,getOffer,deleteOffer,getSettings,saveSettings,listUsers,dbMode} from './db.js';
 import {registerUser,verifyUser,issueSession,readSession,validUsername} from './auth-local.js';
+import {pgConfigured} from './db-pg.js';
 import {resolveRedirectUri,ML_REDIRECT_URI} from './ml-oauth.js';
 import {extractTikTokPrice,extractProduct} from './product-parser.js';
 
-test('db memória: CRUD de ofertas isolado por dono',()=>{
+test('db memória: CRUD de ofertas isolado por dono',async()=>{
   __forceMemory();
   const base={id:'t1',title:'Fone bluetooth',platform:'Shopee',category:'Eletrônicos',price:99.9,oldPrice:null,coupon:'',url:'https://shopee.com.br/product/1/1',image:'',status:'pronta',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
-  upsertOffer(base,'ana');
-  assert.equal(listOffers('ana').length,1);
-  assert.equal(listOffers('bia').length,0);
-  assert.equal(getOffer('t1','ana').title,'Fone bluetooth');
-  assert.ok(deleteOffer('t1','ana'));
-  assert.equal(listOffers('ana').length,0);
+  await upsertOffer(base,'ana');
+  assert.equal((await listOffers('ana')).length,1);
+  assert.equal((await listOffers('bia')).length,0);
+  assert.equal((await getOffer('t1','ana')).title,'Fone bluetooth');
+  assert.ok(await deleteOffer('t1','ana'));
+  assert.equal((await listOffers('ana')).length,0);
 });
-test('db memória: oferta inválida é rejeitada',()=>{
+test('db memória: oferta inválida é rejeitada',async()=>{
   __forceMemory();
-  assert.throws(()=>upsertOffer({id:'x',title:'',platform:'Shopee',price:10,url:'https://shopee.com.br/product/1/1'},'ana'),/inválida/);
+  await assert.rejects(()=>upsertOffer({id:'x',title:'',platform:'Shopee',price:10,url:'https://shopee.com.br/product/1/1'},'ana'),/inválida/);
 });
-test('db memória: settings por dono',()=>{
+test('db memória: settings por dono',async()=>{
   __forceMemory();
-  saveSettings({name:'Loja A',group:'https://chat.whatsapp.com/abc'},'ana');
-  assert.equal(getSettings('ana').name,'Loja A');
-  assert.equal(getSettings('bia').name,undefined);
+  await saveSettings({name:'Loja A',group:'https://chat.whatsapp.com/abc'},'ana');
+  assert.equal((await getSettings('ana')).name,'Loja A');
+  assert.equal((await getSettings('bia')).name,undefined);
 });
-test('auth-local: registro, login e sessão',()=>{
+test('auth-local: registro, login e sessão',async()=>{
   __forceMemory();
   assert.equal(validUsername('equipe1'),true);
   assert.equal(validUsername('ab'),false);
-  registerUser('equipe1','SenhaForte123');
-  assert.throws(()=>registerUser('equipe1','outraSenha123'),/existe/);
-  assert.ok(verifyUser('EQUIPE1','SenhaForte123'));
-  assert.equal(verifyUser('equipe1','errada'),null);
-  const sess=issueSession('equipe1');
-  const back=readSession('central_session='+sess.token);
+  await registerUser('equipe1','SenhaForte123');
+  await assert.rejects(()=>registerUser('equipe1','outraSenha123'),/existe/);
+  assert.ok(await verifyUser('EQUIPE1','SenhaForte123'));
+  assert.equal(await verifyUser('equipe1','errada'),null);
+  const sess=await issueSession('equipe1');
+  const back=await readSession('central_session='+sess.token);
   assert.equal(back?.username,'equipe1');
-  assert.equal(listUsers().length,1);
+  assert.equal((await listUsers()).length,1);
 });
-test('auth-local: senha curta é rejeitada',()=>{
+test('auth-local: senha curta é rejeitada',async()=>{
   __forceMemory();
-  assert.throws(()=>registerUser('curto1','123'),/8-200/);
+  await assert.rejects(()=>registerUser('curto1','123'),/8-200/);
+});
+test('db: sem DATABASE_URL usa fallback local e pgConfigured=false',()=>{
+  __forceMemory();
+  delete process.env.DATABASE_URL;
+  assert.equal(pgConfigured(),false);
+  assert.equal(dbMode(),'memory');
 });
 test('ml-oauth: redirect dinâmico respeita override e host',()=>{
   assert.equal(ML_REDIRECT_URI,'https://central-achadinhos.onrender.com/api/ml/callback');

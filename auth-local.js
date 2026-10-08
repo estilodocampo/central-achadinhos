@@ -6,18 +6,18 @@ function hashPassword(password, salt) {
  return pbkdf2Sync(String(password), salt, 100000, 32, "sha256").toString("hex");
 }
 export function validUsername(u) {return /^[a-z0-9._-]{3,40}$/i.test(String(u||"").trim());}
-export function registerUser(username, password) {
+export async function registerUser(username, password) {
  username=String(username||"").trim().toLowerCase();
  password=String(password||"");
  if(!validUsername(username)) throw Error("Usuário inválido.");
  if(password.length<8||password.length>200) throw Error("Senha deve ter 8-200 caracteres.");
- if(getUser(username)) throw Error("Usuário já existe.");
+ if(await getUser(username)) throw Error("Usuário já existe.");
  const salt=randomBytes(16).toString("hex");
  const hash=hashPassword(password,salt);
  return insertUser(username,salt,hash);
 }
-export function verifyUser(username, password) {
- const u=getUser(username);
+export async function verifyUser(username, password) {
+ const u=await getUser(username);
  if(!u) return null;
  const salt=u.salt ?? u.Salt ?? "";
  const expected=u.hash ?? u.Hash ?? "";
@@ -30,16 +30,16 @@ export function verifyUser(username, password) {
  } catch { ok=false; }
  return ok ? {username:u.username ?? u.Username, createdAt:u.createdAt ?? u.CreatedAt} : null;
 }
-export function issueSession(username) {
+export async function issueSession(username) {
  const token=randomBytes(32).toString("base64url");
  const expiresAt=Date.now()+THIRTY_DAYS;
- createSessionRow(token,String(username).toLowerCase(),expiresAt);
+ await createSessionRow(token,String(username).toLowerCase(),expiresAt);
  return {token,expiresAt};
 }
-export function readSession(cookieHeader) {
+export async function readSession(cookieHeader) {
  const token=getCookie(cookieHeader,SESSION_COOKIE);
  if(!token) return null;
- const row=getSessionRow(token);
+ const row=await getSessionRow(token);
  return row ? {username:row.username, token} : null;
 }
 export function sessionCookie(token, maxAgeSec=30*24*3600) {
@@ -53,8 +53,8 @@ export function getCookie(header, name) {
  }
  return "";
 }
-export function userCount() {try {return listUsers().length;} catch {return 0;}}
-export function destroySession(cookieHeader) {
+export async function userCount() {try {return (await listUsers()).length;} catch {return 0;}}
+export async function destroySession(cookieHeader) {
  const token=getCookie(cookieHeader,SESSION_COOKIE);
- if(token) deleteSessionRow(token);
+ if(token) await deleteSessionRow(token);
 }

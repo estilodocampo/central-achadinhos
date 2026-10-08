@@ -1,6 +1,13 @@
-# Central de Achadinhos — v1.1.0
+# Central de Achadinhos — v1.2.0
 
 Painel web gratuito para organizar ofertas de afiliados do Mercado Livre, Shopee e TikTok Shop e preparar publicações para WhatsApp.
+
+## Novidades v1.2.0 — Postgres persistente
+
+- **Postgres no Render** (`DATABASE_URL` via Blueprint `central-db` free): sobrevive a redeploys/reinícios, múltiplos usuários simultâneos
+- **Fallback automático**: sem `DATABASE_URL` usa SQLite local (`data/central.db`); sem SQLite usa memória. `GET /health` mostra `db: postgres|sqlite|memory`
+- **Mesma API**: `/api/offers`, `/api/settings`, `/api/auth/*` agora async, multi-usuário isolado por `owner`
+- Teste com `npm test` (53 testes). Local sem Postgres continua funcionando zero-config.
 
 ## Novidades v1.1.0
 
@@ -20,7 +27,8 @@ Painel web gratuito para organizar ofertas de afiliados do Mercado Livre, Shopee
 
 ## Executar
 
-Node.js 22 ou mais recente (SQLite nativo). Execute `npm start`, e acesse `http://localhost:3000`. Teste com `npm test` (52 testes).
+Node.js 22 ou mais recente. Execute `npm start`, e acesse `http://localhost:3000`. Teste com `npm test` (53 testes).
+Sem `DATABASE_URL`, usa SQLite local automaticamente. Para testar Postgres local: `set DATABASE_URL=postgres://...` + `npm start`.
 
 ## Deploy automático GitHub → Render
 
