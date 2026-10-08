@@ -1,4 +1,13 @@
-# Central de Achadinhos — Replicador v1.3.0
+# Central de Achadinhos — Replicador v1.4.0
+
+Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — só o login do WhatsApp é guardado (como "manter conectado"), igual à loja.
+
+## Sessão que sobrevive (padrão da loja Estilo do Campo)
+
+- `wa-store.js`: credenciais Baileys em Postgres (`DATABASE_URL`, tabela `wa_auth`) no Render; arquivos locais (`data/wpp-session`) no PC
+- `wa-gateway.js`: retry com backoff (5s→5min), trava de 90s, timeout de versão, códigos terminais (401/403/411/500) pedem reparo em vez de loop, `markOnlineOnConnect: false`
+- Painel: estado de reparo + **vincular por código de 8 letras** (plano B quando o QR não completa) + botão **🔄 Novo QR**
+- Reiniciou ou fez deploy? Reconecta sozinho sem novo QR. Só peça novo QR se mostrar "reparar sessão".
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Nada é salvo** — sem banco, sem login, sem histórico.
 
