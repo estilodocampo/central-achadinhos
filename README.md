@@ -1,6 +1,14 @@
-# Central de Achadinhos — v1.0.4
+# Central de Achadinhos — v1.1.0
 
 Painel web gratuito para organizar ofertas de afiliados do Mercado Livre, Shopee e TikTok Shop e preparar publicações para WhatsApp.
+
+## Novidades v1.1.0
+
+- **SQLite persistente** (`data/central.db`, `DATA_DIR`/`SQLITE_PATH` configuráveis, fallback em memória): `GET/POST /api/offers`, `GET/PUT /api/settings`
+- **Multi-usuário básico**: `POST /api/auth/register|login|logout`, `GET /api/auth/me`, sessões HttpOnly 30 dias (PBKDF2 100k), ofertas isoladas por usuário, `admin` via `CENTRAL_ADMIN_PASSWORD`
+- **Redirect ML dinâmico**: `resolveRedirectUri(req)` usa `ML_REDIRECT_URI` se definido, senão `X-Forwarded-Proto + Host` (suporta localhost http e qualquer domínio Render)
+- **TikTok Shop melhorado**: limpa `| TikTok Shop` do título, `extractTikTokPrice()` com trava anti-recomendação, categorias Papelaria + plurais
+- **Deploy automático**: `render.yaml` com `branch: main` + `autoDeploy: true` + `NODE_VERSION 22.16.0`; todo `git push` redeploya
 
 ## Funcionalidades
 
@@ -12,15 +20,19 @@ Painel web gratuito para organizar ofertas de afiliados do Mercado Livre, Shopee
 
 ## Executar
 
-Node.js 20 ou mais recente. Execute `npm start`, e acesse `http://localhost:3000`. Teste com `npm test`.
+Node.js 22 ou mais recente (SQLite nativo). Execute `npm start`, e acesse `http://localhost:3000`. Teste com `npm test` (52 testes).
+
+## Deploy automático GitHub → Render
+
+Repo privado `estilodocampo/central-achadinhos`, branch `main`. Cada `git push` dispara redeploy (`autoDeploy: true`).
 
 ## Render
 
 Conecte o repositório como Web Service gratuito, runtime Node, branch main, comando de build `npm install && npm test` e de inicialização `npm start`. A rota `/health` responde ao health check.
 
-## Limitações
+## Limitações v1.1
 
-**Os dados são salvos somente no armazenamento do navegador** (localStorage). O servidor não mantém um banco de produtos; faça backups JSON regularmente. Não há autenticação individual ou múltiplos usuários.
+**Logado: salva no servidor (SQLite) e espelha no navegador. Deslogado: só localStorage.** No Render free o disco é efêmero — mantenha backup JSON; use `SQLITE_PATH` em disco persistente ou Postgres futuro para durabilidade total.
 
 Os preços obtidos por metadados podem ser imprecisos ou estar desatualizados; revise sempre antes de publicar. A plataforma não calcula comissões, não consulta vendas, não obtém preços automaticamente em segundo plano nem envia mensagens diretamente para grupos/canais do WhatsApp. O compartilhamento é manual.
 

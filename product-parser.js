@@ -71,7 +71,7 @@ function validCategory(value) {
 function inference(title) {
   const t = normalize(title).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const rules = [
-    ['Moda', /\b(calca|jeans|camiseta|blusa|vestido|shorts|saia|roupa|body|jaqueta|camisa|tenis|bota|sandalia|cropped|legging|moda|cowgirl|country|rodeio|bolsa|biquini|sunga|chinelo|oculos|relogio)\b/],
+    ['Moda', /\b(calcas?|jeans|camisetas?|blusas?|vestidos?|shorts|saias?|roupas?|bodys?|jaquetas?|camisas?|tenis|botas?|sandalias?|cropped|leggings?|moda|cowgirl|country|rodeio|bolsas?|biquinis?|sungas?|chinelos?|oculos|relogios?|kit)\b/],
     ['Eletrônicos', /\b(fone|smartphone|celular|notebook|fone bluetooth|smartwatch|teclado|monitor|computador|tablet|carregador|power bank|caixa de som|echo|alexa|ring light|tripe|microfone|webcam|lampada smart)\b/],
     ['Casa e Decoração', /\b(panela|tapete|almofada|cortina|cama|mesa|cadeira|luminaria|cozinha|organizador|copos|jarra|edredom|caneca|garrafa termica|aspirador|ventilador|umidificador|difusor|vela)\b/],
     ['Beleza', /\b(perfume|maquiagem|batom|cosmetico|hidratante|shampoo|secador de cabelo|unha|skincare|serum|protetor solar|escova|chapinha|base|paleta)\b/],

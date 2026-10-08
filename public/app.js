@@ -6,7 +6,82 @@
   const DEFAULT_SETTINGS = { name: 'Achadinhos VIP | Ofertas do Dia', group: '', channel: '', invite: '🛍️ Entre para o nosso grupo VIP de achadinhos! Ofertas da Shopee, Mercado Livre e TikTok Shop todos os dias. 🔥' };
   const platforms = ['Shopee', 'Mercado Livre', 'TikTok Shop'];
   const statuses = ['rascunho', 'pronta', 'publicada'];
-  const state = { offers: load(KEY, []), categories: load(CATEGORIES, []), settings: { ...DEFAULT_SETTINGS, ...load(SETTINGS, {}) }, selected: null, editing: null, currentView: 'inicio', deleting: null };
+  const state = { offers: load(KEY, []), categories: load(CATEGORIES, []), settings: { ...DEFAULT_SETTINGS, ...load(SETTINGS, {}) }, selected: null, editing: null, currentView: 'inicio', deleting: null, serverUser: null, serverOwner: null };
+  async function api(path, options={}) {
+    const r = await fetch(path, { credentials: 'same-origin', headers: { 'content-type': 'application/json' }, ...options });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    return data;
+  }
+  async function refreshAuth(silent=false) {
+    const status = el('auth-status');
+    try {
+      const me = await api('/api/auth/me');
+      state.serverUser = me.user || null;
+      state.serverOwner = me.owner || null;
+      if (status) {
+        status.className = 'assist-message ' + (me.user ? 'success' : '');
+        status.textContent = me.user
+          ? ('Logado como ' + me.user + ' (' + me.owner + '). Sync ativo no servidor.')
+          : (me.users > 0 ? 'Sessão local. Faça login para sincronizar entre aparelhos.' : 'Nenhuma conta ainda. Crie a primeira conta para ativar o sync.');
+      }
+      const mlUrl = document.getElementById('ml-callback-url');
+      try {
+        const st = await fetch('/api/ml/status', { credentials: 'same-origin' }).then(x => x.json());
+        if (mlUrl && st.redirectUri) mlUrl.textContent = st.redirectUri;
+      } catch {}
+      return me;
+    } catch {
+      if (status && !silent) { status.className = 'assist-message error'; status.textContent = 'Servidor indisponível. Modo somente local.'; }
+      return null;
+    }
+  }
+  async function pullServer() {
+    try {
+      const me = await refreshAuth(true);
+      if (!me?.owner) return false;
+      const [o, s] = await Promise.all([
+        api('/api/offers').catch(() => null),
+        api('/api/settings').catch(() => null)
+      ]);
+      let changed = false;
+      if (o?.offers) {
+        const byId = new Map(state.offers.map(x => [x.id, x]));
+        for (const srv of o.offers) {
+          const loc = byId.get(srv.id);
+          if (!loc || Date.parse(srv.updatedAt) > Date.parse(loc.updatedAt)) { byId.set(srv.id, srv); changed = true; }
+        }
+        // Enviar locais ausentes no servidor
+        const srvIds = new Set(o.offers.map(x => x.id));
+        for (const loc of state.offers) {
+          if (!srvIds.has(loc.id)) fetch('/api/offers', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(loc) }).catch(() => {});
+        }
+        if (changed) {
+          state.offers = [...byId.values()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+          for (const c of state.offers.map(x => x.category)) rememberCategory(c);
+          save();
+        }
+      }
+      if (s?.settings && (s.settings.name || s.settings.group || s.settings.channel || s.settings.invite)) {
+        state.settings = { ...state.settings, ...s.settings };
+        save();
+      }
+      await refreshAuth(true);
+      return changed;
+    } catch { return false; }
+  }
+  function pushOffer(offer) {
+    if (!state.serverOwner) return;
+    fetch('/api/offers', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(offer) }).catch(() => {});
+  }
+  function pushDelete(id) {
+    if (!state.serverOwner) return;
+    fetch('/api/offers/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+  }
+  function pushSettings() {
+    if (!state.serverOwner) return;
+    fetch('/api/settings', { method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ settings: state.settings }) }).catch(() => {});
+  }
   const $ = selector => document.querySelector(selector);
   const $$ = selector => [...document.querySelectorAll(selector)];
   const el = id => document.getElementById(id);
@@ -182,6 +257,7 @@
     if (old) state.offers = state.offers.map(o => o.id === old.id ? data : o);
     else state.offers.unshift(data);
     if (!save()) return;
+    pushOffer(data);
     state.selected = data.id;
     state.editing = null;
     toast(old ? 'Oferta atualizada com sucesso.' : 'Oferta cadastrada com sucesso.');
@@ -320,7 +396,7 @@
     const o = get(state.selected);
     if (!o) return;
     o.status = 'publicada'; o.updatedAt = new Date().toISOString();
-    if (save()) { toast('Oferta marcada como publicada (confirmação manual).'); renderPublishing(); }
+    if (save()) { pushOffer(o); toast('Oferta marcada como publicada (confirmação manual).'); renderPublishing(); }
   }
   function renderSettings() {
     el('setting-name').value = state.settings.name;
@@ -335,7 +411,7 @@
     if (group && !safeHttp(group, true)) return toast('O link do grupo precisa ser HTTPS válido.', true);
     if (channel && !safeHttp(channel, true)) return toast('O link do canal precisa ser HTTPS válido.', true);
     state.settings = { name: el('setting-name').value.trim().slice(0,100) || DEFAULT_SETTINGS.name, group, channel, invite: el('setting-invite').value.trim().slice(0,500) };
-    if (save()) toast('Configurações salvas.');
+    if (save()) { pushSettings(); toast('Configurações salvas.'); }
   }
   function inviteCopy() {
     const parts = [state.settings.invite || DEFAULT_SETTINGS.invite];
@@ -384,7 +460,10 @@
         group: safeHttp(s.group, true), channel: safeHttp(s.channel, true),
         invite: String(s.invite || DEFAULT_SETTINGS.invite).slice(0,500)
       };
-      if (save()) { state.selected = null; renderSettings(); toast(`${all.length} ofertas restauradas.`); }
+      if (save()) { state.selected = null; renderSettings(); toast(`${all.length} ofertas restauradas.`);
+        for (const o of all.slice(0, 200)) pushOffer(o);
+        pushSettings();
+      }
     } catch(error) { toast(error.message || 'Não foi possível restaurar o arquivo.', true); }
   }
   function deleteOffer(id) {
@@ -392,10 +471,11 @@
     el('confirm-modal').classList.remove('hidden');
   }
   function finishDelete() {
-    state.offers = state.offers.filter(o => o.id !== state.deleting);
-    if (state.selected === state.deleting) state.selected = null;
+    const id = state.deleting;
+    state.offers = state.offers.filter(o => o.id !== id);
+    if (state.selected === id) state.selected = null;
     state.deleting = null; el('confirm-modal').classList.add('hidden');
-    if (save()) { renderOffers(); toast('Oferta excluída.'); }
+    if (save()) { pushDelete(id); renderOffers(); toast('Oferta excluída.'); }
   }
   document.addEventListener('click', event => {
     const nav = event.target.closest('[data-view]');
@@ -465,6 +545,32 @@
     }catch {toast('Não foi possível desconectar. Tente novamente.',true);}
   });
   mlConnectionStatus();
+  async function authAction(kind) {
+    const u = el('auth-username').value.trim().toLowerCase();
+    const p = el('auth-password').value;
+    if (!u || !p) return toast('Informe usuário e senha.', true);
+    try {
+      const r = await api('/api/auth/' + kind, { method: 'POST', body: JSON.stringify({ username: u, password: p }) });
+      el('auth-password').value = '';
+      toast(kind === 'login' ? ('Bem-vindo, ' + r.user + '!') : ('Conta ' + r.user + ' criada e logada!'));
+      await pullServer();
+      renderSettings(); navigate(state.currentView);
+    } catch (e) { toast(e.message || 'Falha de autenticação.', true); }
+  }
+  el('auth-login').addEventListener('click', () => authAction('login'));
+  el('auth-register').addEventListener('click', () => authAction('register'));
+  el('auth-logout').addEventListener('click', async () => {
+    try { await api('/api/auth/logout', { method: 'POST' }); } catch {}
+    state.serverUser = null; state.serverOwner = null;
+    await refreshAuth();
+    toast('Sessão encerrada neste navegador.');
+  });
+  el('auth-sync').addEventListener('click', async () => {
+    const changed = await pullServer();
+    renderSettings(); navigate(state.currentView);
+    toast(changed ? 'Sincronizado com o servidor.' : 'Já está atualizado.');
+  });
+  pullServer().then(() => { renderSettings(); if (state.currentView === 'inicio') renderDashboard(); });
   if(new URLSearchParams(window.location.search).get('ml')==='connected') toast('Mercado Livre conectado com sucesso!');
   if(new URLSearchParams(window.location.search).get('ml')==='error') {
     const reason=new URLSearchParams(window.location.search).get('reason');

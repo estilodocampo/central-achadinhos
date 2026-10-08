@@ -1,17 +1,21 @@
 (async function boot(){
   const { createServer } = await import('node:http');
-  const { timingSafeEqual, createHash } = await import('node:crypto');
+  const { timingSafeEqual, createHash, randomUUID } = await import('node:crypto');
   const { extractProduct,mercadolivreItemId } = await import('./product-parser.js');
   const { officialMLPrice } = await import('./mercadolivre-price.js');
-  const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,ML_REDIRECT_URI } = await import('./ml-oauth.js');
+  const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,ML_REDIRECT_URI,resolveRedirectUri } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct} = await import('./shopee-affiliate.js');
+  const { listOffers,getOffer,upsertOffer,deleteOffer,getSettings,saveSettings,listUsers,dbMode } = await import('./db.js');
+  const { registerUser,verifyUser,issueSession,readSession,sessionCookie,clearSessionCookieLocal,destroySession,userCount } = await import('./auth-local.js');
   const { readFile, stat } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
+  const VERSION='1.1.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
+  const PLATFORMS=['Shopee','Mercado Livre','TikTok Shop'];
   function marketUrl(input) {
     const u=new URL(input);
     if(u.protocol!=='https:'||u.username||u.password||u.port) throw Error('Apenas links HTTPS das plataformas selecionadas são aceitos.');
@@ -35,10 +39,10 @@
         if(trace.api==='title_mismatch')return 'O ID encontrado pertence a outro produto. O preço não foi importado por segurança.';
         return 'O produto foi identificado, mas a API não confirmou um preço. Confira o anúncio ou as permissões da integração.';
       }
+      if(product.priceSource&&product.priceSource.includes('TikTok')) return 'Preço obtido de '+product.priceSource+'. Confira a variação antes de divulgar.';
       return 'Preço não encontrado nos dados da loja. Confira manualmente antes de divulgar.';
     };
     for(let i=0;i<6;i++){
-      // Links Shopee diretos: preferir API oficial à leitura HTML.
       const shopeeIds=parseShopeeIds(target.href);
       if(shopeeIds){
         const official=await officialShopeeProduct(shopeeIds);
@@ -89,14 +93,13 @@
           if(n>1500000)throw Error('A página excedeu o limite de leitura.');chunks.push(value);}
       }finally{await reader.cancel().catch(()=>{});}
       const html=new TextDecoder().decode(Buffer.concat(chunks));
-      // Informações estruturais para diagnóstico; nunca expor HTML, link completo ou token.
       const signals={
         finalHost:target.hostname,finalPathType:target.pathname.includes('/social')?'social':target.pathname.includes('/p/')?'catalog':'other',
         mlbTokens:(html.match(/\bMLB-?\d{7,14}\b/gi)||[]).length,
         productFields:(html.match(/product_id/gi)||[]).length,
         itemFields:(html.match(/item_id/gi)||[]).length,
         titleCards:(html.match(/"title"\s*:\s*\{\s*"text"/gi)||[]).length,
-        hasJsonEscapes:html.includes('\\\\"'),
+        hasJsonEscapes:html.includes('\\"'),
         length:html.length
       };
       const product=extractProduct(html,target.href);
@@ -153,6 +156,12 @@
     if(head)return res.end();
     return res.end(type.includes('json')?JSON.stringify(data):data);
   }
+  async function readJson(req,limit=32768){
+    const chunks=[];let size=0;
+    for await(const c of req){size+=c.length;if(size>limit)throw Error('payload_too_large');chunks.push(c);}
+    if(!chunks.length)return {};
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  }
   const protectedAPIs = Boolean(process.env.ML_CLIENT_ID || process.env.ML_CLIENT_SECRET || process.env.SHOPEE_APP_ID || process.env.SHOPEE_APP_SECRET);
   const adminPassword = process.env.CENTRAL_ADMIN_PASSWORD || '';
   function authorized(req){
@@ -167,28 +176,154 @@
     const rhs=createHash('sha256').update(adminPassword,'utf8').digest();
     return timingSafeEqual(lhs,rhs);
   }
+  function currentOwner(req){
+    try{
+      const sess=readSession(req.headers.cookie);
+      if(sess?.username)return String(sess.username).toLowerCase();
+    }catch{}
+    if(authorized(req))return 'admin';
+    try{
+      if(!adminPassword&&userCount()===0)return 'public';
+    }catch{}
+    return null;
+  }
+  function needBasic(res){
+    res.writeHead(401,{'content-type':'text/plain; charset=utf-8','cache-control':'no-store',
+      'www-authenticate':'Basic realm="Central de Achadinhos", charset="UTF-8"',
+      'x-content-type-options':'nosniff','referrer-policy':'no-referrer'});
+    return res.end('Autenticação administrativa necessária.');
+  }
+  function validOfferInput(o){
+    if(!o||typeof o!=='object')return null;
+    const title=String(o.title||'').trim().slice(0,180);
+    const platform=String(o.platform||'');
+    const price=Number(o.price);
+    let url='';
+    try{const u=new URL(String(o.url||''));if((u.protocol==='https:'||u.protocol==='http:')&&!u.username&&!u.password)url=u.href;}catch{}
+    if(!title||!PLATFORMS.includes(platform)||!Number.isFinite(price)||price<=0||price>10000000||!url)return null;
+    let image='';
+    try{const u=new URL(String(o.image||''));if(u.protocol==='https:'&&!u.username&&!u.password)image=u.href;}catch{if(String(o.image||'').trim())return null;}
+    let oldPrice=null;
+    if(o.oldPrice!==null&&o.oldPrice!==undefined&&String(o.oldPrice)!==''){
+      oldPrice=Number(o.oldPrice);
+      if(!Number.isFinite(oldPrice)||oldPrice<=price||oldPrice>10000000)return null;
+    }
+    return {id:String(o.id||randomUUID()).slice(0,75),title,platform,
+      category:String(o.category||'').trim().slice(0,60),price,oldPrice,
+      coupon:String(o.coupon||'').trim().slice(0,70),url,image,
+      status:['rascunho','pronta','publicada'].includes(o.status)?o.status:'rascunho',
+      createdAt:String(o.createdAt||new Date().toISOString()),
+      updatedAt:new Date().toISOString()};
+  }
+  const PUBLIC_AUTH_PATHS=new Set(['/api/auth/login','/api/auth/register','/api/auth/me']);
   const server=createServer(async(req,res)=>{
     try{
-      const path=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`).pathname;
-      // Health check continua público para o monitoramento do Render.
-      if(protectedAPIs && path !== '/health' && path !== '/api/ml/callback') {
+      const parsed=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);
+      const path=parsed.pathname;
+      if(protectedAPIs && path !== '/health' && path !== '/api/ml/callback' && !PUBLIC_AUTH_PATHS.has(path)) {
         if(!adminPassword)return send(res,503,{error:'Antes de ativar as APIs, configure CENTRAL_ADMIN_PASSWORD no Render.'});
-        if(!authorized(req)){
-          res.writeHead(401,{'content-type':'text/plain; charset=utf-8','cache-control':'no-store',
-            'www-authenticate':'Basic realm="Central de Achadinhos", charset="UTF-8"',
-            'x-content-type-options':'nosniff','referrer-policy':'no-referrer'});
-          return res.end('Autenticação administrativa necessária.');
-        }
+        if(!authorized(req)&&!readSession(req.headers.cookie))return needBasic(res);
       }
-      if(path==='/health')return send(res,200,{ok:true,version:'1.1.0'});
+      if(path==='/health')return send(res,200,{ok:true,version:VERSION,db:dbMode()});
+      if(path==='/api/auth/me'){
+        if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
+        const sess=readSession(req.headers.cookie);
+        const owner=currentOwner(req);
+        return send(res,200,{user:sess?.username||(authorized(req)?'admin':null),owner:owner||null,
+          users:userCount(),adminProtected:Boolean(adminPassword),protectedAPIs});
+      }
+      if(path==='/api/auth/register'){
+        if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        try{
+          if(userCount()>0&&!currentOwner(req))return send(res,401,{error:'Faça login para criar usuários.'});
+          const created=registerUser(body.username,body.password);
+          const sess=issueSession(created.username);
+          return send(res,201,{ok:true,user:created.username},'application/json; charset=utf-8',false,{'set-cookie':sessionCookie(sess.token)});
+        }catch(e){return send(res,400,{error:e?.message||'Não foi possível registrar.'});}
+      }
+      if(path==='/api/auth/login'){
+        if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        const ok=verifyUser(body.username,body.password);
+        if(!ok){
+          if(adminPassword&&String(body.username||'').toLowerCase()==='admin'){
+            const lhs=createHash('sha256').update(String(body.password||''),'utf8').digest();
+            const rhs=createHash('sha256').update(adminPassword,'utf8').digest();
+            if(lhs.length===rhs.length&&timingSafeEqual(lhs,rhs)){
+              const sess=issueSession('admin');
+              return send(res,200,{ok:true,user:'admin'},'application/json; charset=utf-8',false,{'set-cookie':sessionCookie(sess.token)});
+            }
+          }
+          return send(res,401,{error:'Usuário ou senha inválidos.'});
+        }
+        const sess=issueSession(ok.username);
+        return send(res,200,{ok:true,user:ok.username},'application/json; charset=utf-8',false,{'set-cookie':sessionCookie(sess.token)});
+      }
+      if(path==='/api/auth/logout'){
+        if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
+        destroySession(req.headers.cookie);
+        return send(res,200,{ok:true},'application/json; charset=utf-8',false,{'set-cookie':clearSessionCookieLocal()});
+      }
+      if(path==='/api/offers'&&req.method==='GET'){
+        const owner=currentOwner(req);
+        if(!owner)return send(res,401,{error:'Faça login.'});
+        return send(res,200,{offers:listOffers(owner),owner});
+      }
+      if(path==='/api/offers'&&req.method==='POST'){
+        const owner=currentOwner(req);
+        if(!owner)return send(res,401,{error:'Faça login.'});
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        const clean=validOfferInput(body);
+        if(!clean)return send(res,400,{error:'Oferta inválida.'});
+        if(countGuard(owner))return send(res,413,{error:'Limite de 3000 ofertas.'});
+        return send(res,201,{offer:upsertOffer(clean,owner)});
+      }
+      if(path.startsWith('/api/offers/')&&(req.method==='PUT'||req.method==='DELETE'||req.method==='GET')){
+        const owner=currentOwner(req);
+        if(!owner)return send(res,401,{error:'Faça login.'});
+        const id=decodeURIComponent(path.slice('/api/offers/'.length).split('/')[0]||'');
+        if(!id)return send(res,400,{error:'ID inválido.'});
+        if(req.method==='DELETE'){
+          const ok=deleteOffer(id,owner);
+          if(!ok)return send(res,404,{error:'Oferta não encontrada.'});
+          return send(res,200,{ok:true});
+        }
+        if(req.method==='GET'){
+          const o=getOffer(id,owner);
+          if(!o)return send(res,404,{error:'Oferta não encontrada.'});
+          return send(res,200,{offer:o});
+        }
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        body.id=id;
+        const clean=validOfferInput(body);
+        if(!clean)return send(res,400,{error:'Oferta inválida.'});
+        return send(res,200,{offer:upsertOffer(clean,owner)});
+      }
+      if(path==='/api/settings'&&req.method==='GET'){
+        const owner=currentOwner(req);
+        if(!owner)return send(res,401,{error:'Faça login.'});
+        return send(res,200,{settings:getSettings(owner),owner});
+      }
+      if(path==='/api/settings'&&(req.method==='PUT'||req.method==='POST')){
+        const owner=currentOwner(req);
+        if(!owner)return send(res,401,{error:'Faça login.'});
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        return send(res,200,{settings:saveSettings(body?.settings||body,owner)});
+      }
       if(path==='/api/ml/status'){
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
-        return send(res,200,{...sessionStatus(req.headers.cookie),redirectUri:ML_REDIRECT_URI});
+        return send(res,200,{...sessionStatus(req.headers.cookie),redirectUri:resolveRedirectUri(req)});
       }
       if(path==='/api/ml/start'){
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
         try{
-          const start=createAuthorization();
+          const start=createAuthorization(process.env,resolveRedirectUri(req));
           res.writeHead(302,{'location':start.url,'set-cookie':start.cookie,
             'cache-control':'no-store','referrer-policy':'no-referrer'});
           return res.end();
@@ -196,7 +331,7 @@
       }
       if(path==='/api/ml/callback'){
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
-        const query=new URL(req.url,'https://central-achadinhos.onrender.com').searchParams;
+        const query=new URL(req.url,`http://${req.headers.host||'localhost'}`).searchParams;
         try{
           const tokens=await completeAuthorization(Object.fromEntries(query.entries()),req.headers.cookie);
           res.writeHead(303,{'location':'/?ml=connected','set-cookie':[tokens.cookie,tokens.clearState],
@@ -208,7 +343,7 @@
             error.message.includes('tokens inválida')?'response':
             error.message.includes('Código de autorização')?'code':
             error.message.includes('Autorização não foi concluída')?'denied':'unknown';
-          const httpStatus=reason==='token'?(error.message.match(/HTTP (400|401|403|429|5\\d\\d)/)||[])[1]:undefined;
+          const httpStatus=reason==='token'?(error.message.match(/HTTP (400|401|403|429|5\d\d)/)||[])[1]:undefined;
           console.warn('[ML_OAUTH] Falha na autorização; etapa='+reason+(httpStatus?', http='+httpStatus:''));
           res.writeHead(303,{'location':'/?ml=error&reason='+reason,
             'cache-control':'no-store','referrer-policy':'no-referrer'});
@@ -219,11 +354,11 @@
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
         return send(res,200,{ok:true,connected:false},'application/json; charset=utf-8',false,{'set-cookie':clearSessionCookie()});
       }
-
       if(path==='/api/integration-status')return send(res,200,{
         mercadoLivre:{configured:Boolean(process.env.ML_CLIENT_ID&&process.env.ML_CLIENT_SECRET),connected:sessionStatus(req.headers.cookie).connected},
         shopee:{appIdConfigured:Boolean(process.env.SHOPEE_APP_ID),appSecretConfigured:Boolean(process.env.SHOPEE_APP_SECRET)},
-        accessProtected:protectedAPIs && Boolean(adminPassword)
+        accessProtected:protectedAPIs && Boolean(adminPassword),
+        users:userCount(),db:dbMode()
       });
       if(path==='/api/preview'){
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
@@ -245,12 +380,18 @@
       return send(res,200,file,MIMES[extname(target)]||'application/octet-stream',req.method==='HEAD');
     }catch{return send(res,500,{error:'Erro interno.'});}
   });
+  function countGuard(owner){
+    try{
+      const {countOffers}=esmCountHack;
+      return countOffers(owner)>=3000;
+    }catch{return false;}
+  }
+  const esmCountHack=await import('./db.js');
   server.listen(PORT,'0.0.0.0',()=>{
-    console.log('Central de Achadinhos na porta '+PORT);
-    console.log('Integracoes configuradas: MLApp='+Boolean(process.env.ML_CLIENT_ID&&process.env.ML_CLIENT_SECRET)+
+    console.log('Central de Achadinhos '+VERSION+' na porta '+PORT);
+    console.log('DB='+dbMode()+', users='+userCount()+', MLApp='+Boolean(process.env.ML_CLIENT_ID&&process.env.ML_CLIENT_SECRET)+
       ', ShopeeID='+Boolean(process.env.SHOPEE_APP_ID)+
       ', ShopeeSecret='+Boolean(process.env.SHOPEE_APP_SECRET)+
       ', SenhaAdmin='+Boolean(adminPassword));
-
   });
 })();

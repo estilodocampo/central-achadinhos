@@ -21,7 +21,7 @@
       <button class="nav-btn" data-view="publicacoes"><span class="nav-emoji">↗</span> Publicações</button>
       <button class="nav-btn" data-view="config"><span class="nav-emoji">⚙</span> Configurações</button>
     </nav>
-    <div class="sidebar-bottom"><span class="online-dot"></span> Versão gratuita <span class="ver">v1.0.4</span><p>Seu catálogo é salvo neste navegador. Faça backups regularmente.</p></div>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Versão multi-device <span class="ver">v1.1.0</span><p>Sync automático no servidor + backup local. Faça login em Configurações.</p></div>
   </aside>
 
   <main class="main-content">
@@ -77,6 +77,19 @@
     <section class="view hidden" id="view-config">
       <div class="section-head larger"><div><div class="eyebrow dark">PREFERÊNCIAS</div><h1 class="page-heading">Configurações</h1><p>Links da comunidade e cópia de segurança</p></div></div>
       <div class="config-layout">
+      <div class="panel settings-panel" style="grid-column:1/-1" aria-label="Acesso e sincronização">
+        <div class="panel-head"><div><h3>👤 Acesso e sincronização</h3>
+        <p>Entre com seu usuário para salvar no servidor e usar em outros aparelhos. Sem login, os dados ficam só neste navegador.</p></div></div>
+        <p id="auth-status" class="assist-message" role="status">Verificando sessão…</p>
+        <div class="form-row"><label class="field"><span>Usuário</span><input id="auth-username" maxlength="40" autocomplete="username" placeholder="ex.: equipe1"></label><label class="field"><span>Senha</span><input id="auth-password" type="password" maxlength="200" autocomplete="current-password" placeholder="mín. 8 caracteres"></label></div>
+        <div class="composer-actions">
+          <button type="button" id="auth-login" class="btn btn-primary">Entrar</button>
+          <button type="button" id="auth-register" class="btn btn-outline">Criar conta</button>
+          <button type="button" id="auth-logout" class="btn btn-outline">Sair</button>
+          <button type="button" id="auth-sync" class="btn btn-dark">Sincronizar agora</button>
+        </div>
+        <div class="info-note standalone">O primeiro cadastro libera o acesso. Com <code>CENTRAL_ADMIN_PASSWORD</code> no Render, use usuário <code>admin</code> + essa senha para entrar.</div>
+      </div>
       <div class="panel settings-panel" style="grid-column:1/-1" aria-label="Integração Mercado Livre">
         <div class="panel-head"><div><h3>🔐 Mercado Livre — conexão oficial</h3>
         <p>Autorize o aplicativo para consultar preços com segurança, sem copiar tokens manualmente.</p></div></div>
@@ -86,12 +99,12 @@
           <button type="button" id="ml-connect" class="btn btn-primary" disabled>Conectar Mercado Livre</button>
           <button type="button" id="ml-disconnect" class="btn btn-outline" disabled>Desconectar</button>
         </div>
-        <div class="info-note standalone">URL de retorno: <code>https://central-achadinhos.onrender.com/api/ml/callback</code></div>
+        <div class="info-note standalone">URL de retorno: <code id="ml-callback-url">https://central-achadinhos.onrender.com/api/ml/callback</code> (detectada automaticamente por domínio; defina <code>ML_REDIRECT_URI</code> para forçar).</div>
       </div>
       <form class="panel settings-panel" id="settings-form"><div class="panel-head"><div><h3>Sua comunidade</h3><p>Use seus links para atrair novos participantes</p></div></div><label class="field"><span>Nome da comunidade</span><input id="setting-name" maxlength="100" placeholder="Achadinhos VIP | Ofertas do Dia"></label><label class="field"><span>Link de convite do grupo</span><input type="url" id="setting-group" placeholder="https://chat.whatsapp.com/..."></label><label class="field"><span>Link do canal</span><input type="url" id="setting-channel" placeholder="https://whatsapp.com/channel/..."></label><label class="field"><span>Texto de convite</span><textarea id="setting-invite" rows="3" maxlength="500" placeholder="Venha receber as melhores ofertas!"></textarea></label><button type="submit" class="btn btn-primary">Salvar configurações</button><button type="button" class="btn btn-outline" id="copy-invite">Copiar convite do grupo</button></form>
-      <div class="panel settings-panel"><div class="panel-head"><div><h3>Seus dados</h3><p>Controle de informações e backups</p></div></div><div class="backup-item"><span class="backup-icon">↓</span><div><b>Exportar backup JSON</b><p>Salva suas ofertas e configurações em arquivo.</p></div><button type="button" class="btn btn-outline" id="export-json">Exportar</button></div><div class="backup-item"><span class="backup-icon">▤</span><div><b>Exportar planilha CSV</b><p>Lista suas ofertas para conferência.</p></div><button type="button" class="btn btn-outline" id="export-csv">Exportar</button></div><div class="backup-item"><span class="backup-icon">↑</span><div><b>Restaurar backup JSON</b><p>Substitui as ofertas e configurações atuais.</p></div><button type="button" class="btn btn-outline" id="import-json-button">Importar</button><input type="file" id="import-json" accept=".json,application/json" hidden></div><div class="info-note standalone">Dados ficam no armazenamento do navegador deste dispositivo. Limpar os dados do navegador pode apagá-los. O backup permite restaurar seus cadastros.</div></div></div>
+      <div class="panel settings-panel"><div class="panel-head"><div><h3>Seus dados</h3><p>Controle de informações e backups</p></div></div><div class="backup-item"><span class="backup-icon">↓</span><div><b>Exportar backup JSON</b><p>Salva suas ofertas e configurações em arquivo.</p></div><button type="button" class="btn btn-outline" id="export-json">Exportar</button></div><div class="backup-item"><span class="backup-icon">▤</span><div><b>Exportar planilha CSV</b><p>Lista suas ofertas para conferência.</p></div><button type="button" class="btn btn-outline" id="export-csv">Exportar</button></div><div class="backup-item"><span class="backup-icon">↑</span><div><b>Restaurar backup JSON</b><p>Substitui as ofertas e configurações atuais.</p></div><button type="button" class="btn btn-outline" id="import-json-button">Importar</button><input type="file" id="import-json" accept=".json,application/json" hidden></div><div class="info-note standalone">Logado: salva no servidor (SQLite) e espelha neste navegador. Deslogado: só navegador. Limpar dados do navegador apaga a cópia local.</div></div></div>
     </section>
-    <footer class="footer">Central de Achadinhos <b>v1.0</b> <span>•</span> Painel independente. Não afiliado às plataformas.</footer>
+    <footer class="footer">Central de Achadinhos <b>v1.1</b> <span>•</span> Painel independente. Não afiliado às plataformas.</footer>
   </main>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

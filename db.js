@@ -144,3 +144,4 @@ export function pruneSessions() {
 }
 setInterval(pruneSessions, 3600000).unref?.();
 export function _resetMemory() {memory={offers:new Map(),settings:new Map(),users:new Map(),sessions:new Map()};}
+export function __forceMemory(){try{db?.close?.();}catch{}db=null;_resetMemory();return true;}
