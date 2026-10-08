@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isGroupJid, normalizeGroupIds, validateSend} from './wa-gateway.js';
+import {isGroupJid, normalizeGroupIds, validateSend, classifyClose, backoffFor} from './wa-gateway.js';
 
 test('jid de grupo válido e inválido', () => {
   assert.equal(isGroupJid('120363123456@g.us'), true);
@@ -17,6 +17,19 @@ test('normaliza ids: dedup, filtra e limita a 20', () => {
   assert.equal(normalizeGroupIds(many).length, 20);
 });
 
+test('classifyClose: sessão morta pede reparo, resto tenta de novo', () => {
+  assert.equal(classifyClose(401), 'repair');
+  assert.equal(classifyClose(403), 'repair');
+  assert.equal(classifyClose(411), 'repair');
+  assert.equal(classifyClose(500), 'repair');
+  assert.equal(classifyClose(428), 'retry');
+  assert.equal(classifyClose(0), 'retry');
+});
+
+test('backoffFor: 5s, 15s, 30s, 60s, 5min com teto', () => {
+  assert.deepEqual([backoffFor(0), backoffFor(1), backoffFor(2), backoffFor(3), backoffFor(4)], [5000, 15000, 30000, 60000, 300000]);
+  assert.equal(backoffFor(99), 300000);
+});
 test('validateSend recusa mensagem vazia, longa ou sem grupo', () => {
   assert.equal(validateSend('', ['120363000001@g.us']).ok, false);
   assert.equal(validateSend('x'.repeat(2001), ['120363000001@g.us']).ok, false);

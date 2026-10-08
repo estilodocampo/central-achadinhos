@@ -1,12 +1,12 @@
 {
   "name": "central-achadinhos",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
-  "description": "Replicador de anúncios de afiliados para grupos de WhatsApp. Nada é salvo.",
+  "description": "Replicador de anúncios de afiliados para grupos de WhatsApp. Só a sessão de login é guardada; ofertas nunca são salvas.",
   "scripts": {
     "start": "node server.js",
-    "test": "node --check public/app.js && node --check server.js && node --check wa-gateway.js && node --test"
+    "test": "node --check public/app.js && node --check server.js && node --check wa-gateway.js && node --check wa-store.js && node --test"
   },
   "engines": {
     "node": ">=22"
@@ -14,6 +14,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "qrcode": "^1.5.4"
   }

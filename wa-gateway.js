@@ -1,42 +1,34 @@
-import {DisconnectReason, fetchLatestBaileysVersion, initAuthCreds, makeCacheableSignalKeyStore, makeWASocket} from "@whiskeysockets/baileys";
+// wa-gateway.js — WhatsApp como aparelho vinculado (envio automático).
+// Sessão de login persiste via wa-store (Postgres no Render, arquivos no PC).
+// Ofertas, mensagens e grupos NUNCA são salvos.
+import {DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, makeWASocket} from "@whiskeysockets/baileys";
 import pino from "pino";
 import QRCode from "qrcode";
+import {loadAuthState, clearAuthState, storeMode} from "./wa-store.js";
 
 const MAX_GROUPS_PER_SEND = 20;
 const MAX_MESSAGE = 2000;
+const TERMINAL_CODES = new Set([401, 403, 411, 500]);
+const BACKOFF = [5000, 15000, 30000, 60000, 300000];
 
 let sock = null;
-let starting = null;
 let connected = false;
-let phoneUser = null;
+let connecting = false;
+let connectingSince = 0;
+let retryTimer = null;
+let retries = 0;
+let needsRepair = false;
+let lastError = "";
+let lastErrorAt = 0;
 let lastQr = "";
 let lastQrAt = 0;
+let pairCode = null;
+let pairCodeAt = 0;
+let phoneUser = null;
 let groupsCache = [];
 let groupsAt = 0;
-let creds = initAuthCreds();
-const keyStore = Object.create(null);
-
-function signalKeys() {
-  return {
-    get: async (type, ids) => {
-      const out = {};
-      for (const id of ids) {
-        const v = keyStore[type + "::" + id];
-        if (v) out[id] = v;
-      }
-      return out;
-    },
-    set: async (data) => {
-      for (const type of Object.keys(data)) {
-        for (const id of Object.keys(data[type] || {})) {
-          const v = data[type][id];
-          if (v) keyStore[type + "::" + id] = v;
-          else delete keyStore[type + "::" + id];
-        }
-      }
-    },
-  };
-}
+let waVersionUsed = "";
+const bootAt = Date.now();
 
 export function isGroupJid(jid) {
   return typeof jid === "string" && jid.endsWith("@g.us") && jid.length > 10 && !jid.includes(" ");
@@ -61,9 +53,32 @@ export function validateSend(message, groupIds) {
   return {ok: true, message: text, groups};
 }
 
-function resetCreds() {
-  creds = initAuthCreds();
-  for (const k of Object.keys(keyStore)) delete keyStore[k];
+// Puro/testável: decide o que fazer ao fechar a conexão.
+export function classifyClose(code) {
+  if (TERMINAL_CODES.has(code)) return "repair";
+  return "retry";
+}
+
+export function backoffFor(attempt) {
+  return BACKOFF[Math.min(Math.max(0, attempt), BACKOFF.length - 1)];
+}
+
+function errCode(err) {
+  try {
+    if (!err) return 0;
+    if (err.output?.statusCode) return Number(err.output.statusCode) || 0;
+    if (err.statusCode) return Number(err.statusCode) || 0;
+    if (err.code && /^\d+$/.test(String(err.code))) return Number(err.code);
+    if (err.data?.statusCode) return Number(err.data.statusCode) || 0;
+  } catch {}
+  return 0;
+}
+
+function scheduleRetry() {
+  if (retryTimer) return;
+  const wait = backoffFor(retries);
+  retryTimer = setTimeout(() => { retryTimer = null; startWhatsApp().catch(() => {}); }, wait);
+  if (retryTimer.unref) retryTimer.unref();
 }
 
 async function refreshGroups() {
@@ -80,59 +95,91 @@ async function refreshGroups() {
 }
 
 async function boot() {
-  const {version} = await fetchLatestBaileysVersion();
-  const auth = {creds, keys: makeCacheableSignalKeyStore(signalKeys(), pino({level: "silent"}))};
-  const s = makeWASocket({
-    version,
-    auth,
-    logger: pino({level: "silent"}),
-    printQRInTerminal: false,
-    browser: ["Central Achadinhos", "Chrome", "1.3"],
-    syncFullHistory: false,
-  });
-  creds = auth.creds;
-  s.ev.on("creds.update", () => { creds = auth.creds; });
-  s.ev.on("connection.update", async (u) => {
-    if (u.qr) {
-      lastQr = u.qr;
-      lastQrAt = Date.now();
-    }
-    if (u.connection === "open") {
-      connected = true;
-      lastQr = "";
-      phoneUser = s.user ? String(s.user.id || "").split(":")[0] : null;
-      await refreshGroups();
-    }
-    if (u.connection === "close") {
-      connected = false;
-      const code = u.lastDisconnect?.error?.output?.statusCode;
-      if (code === DisconnectReason.loggedOut) {
-        resetCreds();
-        lastQr = "";
+  if (connecting && Date.now() - connectingSince < 90000 && sock) return sock;
+  if (connecting && Date.now() - connectingSince >= 90000) {
+    try { sock?.ws?.close?.(); } catch {}
+    sock = null;
+    connecting = false;
+  }
+  if (connecting || sock) return sock;
+  connecting = true;
+  connectingSince = Date.now();
+  try {
+    const {state, saveCreds} = await loadAuthState();
+    let version;
+    try {
+      const v = await Promise.race([
+        fetchLatestBaileysVersion(),
+        new Promise((_, rej) => setTimeout(() => rej(Error("timeout versão")), 10000)),
+      ]);
+      version = v.version;
+      waVersionUsed = Array.isArray(version) ? version.join(".") : String(version || "");
+    } catch { version = undefined; }
+    const s = makeWASocket({
+      auth: {creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({level: "silent"}))},
+      version,
+      logger: pino({level: "silent"}),
+      printQRInTerminal: false,
+      browser: ["Central Achadinhos", "Chrome", "1.3"],
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+    });
+    sock = s;
+    s.ev.on("creds.update", saveCreds);
+    s.ev.on("connection.update", async (u) => {
+      if (u.qr) {
+        try { lastQr = await QRCode.toDataURL(u.qr, {width: 240, margin: 1}); lastQrAt = Date.now(); }
+        catch { lastQr = ""; }
       }
-      const delay = code === DisconnectReason.restartRequired ? 1000 : 4000;
-      setTimeout(() => { starting = null; startWhatsApp().catch(() => {}); }, delay);
-    }
-  });
-  sock = s;
-  return s;
+      if (u.connection === "open") {
+        connected = true;
+        connecting = false;
+        lastQr = "";
+        pairCode = null;
+        pairCodeAt = 0;
+        lastError = "";
+        lastErrorAt = 0;
+        retries = 0;
+        needsRepair = false;
+        phoneUser = s.user ? String(s.user.id || "").split(":")[0] : null;
+        await refreshGroups();
+      } else if (u.connection === "close") {
+        connected = false;
+        const code = errCode(u.lastDisconnect?.error);
+        retries++;
+        lastErrorAt = Date.now();
+        sock = null;
+        connecting = false;
+        if (classifyClose(code) === "repair") {
+          needsRepair = true;
+          lastError = "Sessão inválida (código " + code + "). Desconecte e pareie de novo.";
+        } else {
+          lastError = "Desconectado (código " + (code || "?") + ") — reconectando (tentativa " + retries + ")";
+          scheduleRetry();
+        }
+      }
+    });
+    return s;
+  } catch {
+    connecting = false;
+    scheduleRetry();
+    throw Error("boot");
+  }
 }
 
 export function startWhatsApp() {
   if (sock && connected) return Promise.resolve(sock);
-  if (starting) return starting;
-  starting = boot().catch((e) => { starting = null; throw e; });
-  return starting;
+  return boot().catch(() => sock);
 }
 
 export async function waStatus() {
-  let qrDataUrl = null;
-  if (!connected && lastQr && Date.now() - lastQrAt < 60000) {
-    try { qrDataUrl = await QRCode.toDataURL(lastQr, {width: 240, margin: 1}); }
-    catch { qrDataUrl = null; }
-  }
-  return {connected, user: phoneUser, qr: qrDataUrl, qrFresh: Boolean(qrDataUrl),
-    groups: groupsCache.length, groupsAt, maxPerSend: MAX_GROUPS_PER_SEND};
+  const qrFresh = Boolean(!connected && !needsRepair && lastQr && Date.now() - lastQrAt < 60000);
+  return {connected, user: phoneUser, qr: qrFresh ? lastQr : null, qrFresh,
+    needsRepair, lastError: lastError || null, retries,
+    pairCode, pairAge: pairCode ? Math.round((Date.now() - pairCodeAt) / 1000) : null,
+    groups: groupsCache.length, groupsAt,
+    uptimeSec: Math.round((Date.now() - bootAt) / 1000),
+    session: storeMode(), maxPerSend: MAX_GROUPS_PER_SEND};
 }
 
 export async function waGroups(force = false) {
@@ -163,7 +210,7 @@ export async function waSend(message, groupIds, imageUrl = "") {
       if (image) await sock.sendMessage(jid, {image, caption: v.message});
       else await sock.sendMessage(jid, {text: v.message});
       results.push({id: jid, ok: true});
-    } catch (e) {
+    } catch {
       results.push({id: jid, ok: false, error: "Falha no envio."});
     }
     await new Promise((r) => setTimeout(r, 800));
@@ -171,15 +218,32 @@ export async function waSend(message, groupIds, imageUrl = "") {
   return {sent: results.filter((r) => r.ok).length, total: results.length, results};
 }
 
+export async function waPairCode(phone) {
+  const clean = String(phone || "").replace(/\D/g, "");
+  if (clean.length < 10 || clean.length > 15) throw Error("Informe o número com DDI+DDD, só dígitos (ex: 5511999999999).");
+  if (!sock || typeof sock.requestPairingCode !== "function") throw Error("Sessão não iniciada. Aguarde o QR aparecer e tente de novo.");
+  const code = await sock.requestPairingCode(clean);
+  if (!code) throw Error("O WhatsApp não devolveu o código. Tente de novo.");
+  pairCode = String(code).replace("-", "");
+  pairCodeAt = Date.now();
+  return pairCode.slice(0, 4) + "-" + pairCode.slice(4);
+}
+
 export async function waLogout() {
   try { await sock?.logout?.(); } catch {}
   try { sock?.end?.(); } catch {}
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
   sock = null;
-  starting = null;
   connected = false;
+  connecting = false;
   phoneUser = null;
   lastQr = "";
+  pairCode = null;
   groupsCache = [];
-  resetCreds();
+  lastError = "";
+  retries = 0;
+  needsRepair = false;
+  await clearAuthState();
+  setTimeout(() => { startWhatsApp().catch(() => {}); }, 1500);
   return {ok: true};
 }

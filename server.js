@@ -5,13 +5,13 @@
   const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct} = await import('./shopee-affiliate.js');
-  const { startWhatsApp,waStatus,waGroups,waSend,waLogout } = await import('./wa-gateway.js');
+  const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode } = await import('./wa-gateway.js');
   const { readFile, stat } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
-  const VERSION='1.3.0';
+  const VERSION='1.4.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
   function marketUrl(input) {
     const u=new URL(input);
@@ -237,6 +237,13 @@
       if(path==='/api/wa/logout'){
         if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
         return send(res,200,await waLogout());
+      }
+      if(path==='/api/wa/pair'){
+        if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        try{return send(res,200,{code:await waPairCode(body.phone)});}
+        catch(e){return send(res,400,{error:e?.message||'Falha ao gerar código.'});}
       }
       if(req.method!=='GET'&&req.method!=='HEAD')return send(res,405,{error:'Método inválido.'});
       const loc=path==='/'?'/index.html':path;

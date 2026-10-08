@@ -50,6 +50,13 @@
       <div class="panel-head"><div><h3>↗ 3. Replicar nos grupos</h3><p>Escaneie o QR com o WhatsApp e selecione os grupos.</p></div><button type="button" id="wa-refresh" class="btn btn-outline btn-sm">Atualizar</button></div>
       <div id="wa-box">
         <p id="wa-status" class="assist-message" role="status">Conectando…</p>
+        <div id="repair-wrap" class="hidden">
+          <p class="assist-message error" id="repair-msg" role="status"></p>
+          <div class="form-row"><label class="field"><span>Vincular por código <small>se o QR não completa</small></span><input id="pair-phone" inputmode="numeric" maxlength="15" placeholder="5511999999999"></label></div>
+          <div class="composer-actions"><button type="button" id="pair-btn" class="btn btn-outline">Gerar código</button><button type="button" id="newqr-btn" class="btn btn-outline">🔄 Novo QR</button></div>
+          <p id="pair-code" class="assist-message" role="status"></p>
+          <p class="tiny-warning">No WhatsApp: Aparelhos conectados → Conectar aparelho → Vincular com número de telefone → digite o código.</p>
+        </div>
         <div id="qr-wrap" class="hidden"><img id="qr-img" alt="QR para conectar o WhatsApp" width="240" height="240"><p class="tiny-warning">Abra o WhatsApp → Aparelhos conectados → Conectar aparelho → escaneie.</p></div>
         <div id="groups-list" class="publish-list"></div>
         <div class="composer-actions"><button type="button" id="select-all" class="btn btn-outline">Todos</button><button type="button" id="select-none" class="btn btn-outline">Nenhum</button><button type="button" id="send-btn" class="btn btn-whatsapp">Replicar agora ↗</button><button type="button" id="wa-logout" class="btn btn-outline">Desconectar</button></div>

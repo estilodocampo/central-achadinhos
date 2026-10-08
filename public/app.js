@@ -134,12 +134,23 @@
         st.className = 'assist-message success';
         st.textContent = 'Conectado' + (s.user ? ' como ' + s.user : '') + '. Selecione os grupos abaixo.';
         el('qr-wrap').classList.add('hidden');
+        el('repair-wrap').classList.add('hidden');
         await loadGroups(false);
+      } else if (s.needsRepair) {
+        pill.textContent = 'WhatsApp: reparar sessão';
+        pill.className = 'status-pill rascunho';
+        st.className = 'assist-message error';
+        st.textContent = s.lastError || 'Sessão inválida. Gere um novo QR ou use o código.';
+        el('qr-wrap').classList.add('hidden');
+        el('repair-wrap').classList.remove('hidden');
+        el('repair-msg').textContent = s.lastError || 'Sessão inválida.';
       } else {
         pill.textContent = 'WhatsApp: escaneie o QR';
         pill.className = 'status-pill rascunho';
         st.className = 'assist-message error';
-        st.textContent = 'Desconectado. Escaneie o QR para conectar sua conta.';
+        st.textContent = (s.lastError ? s.lastError + ' ' : '') + 'Desconectado. Escaneie o QR para conectar sua conta.';
+        el('repair-wrap').classList.toggle('hidden', !s.lastError);
+        if (s.lastError) el('repair-msg').textContent = s.lastError;
         if (s.qr) { el('qr-img').src = s.qr; el('qr-wrap').classList.remove('hidden'); }
         else el('qr-wrap').classList.add('hidden');
       }
@@ -212,6 +223,24 @@
     await fetch('/api/wa/logout', {method: 'POST'}).catch(() => {});
     toast('WhatsApp desconectado.');
     waRefresh();
+  });
+  el('pair-btn').addEventListener('click', async () => {
+    const phone = el('pair-phone').value.replace(/\D/g, '');
+    if (!phone) return toast('Digite seu número com DDI+DDD.', true);
+    try {
+      const r = await fetch('/api/wa/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({phone})});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha.');
+      el('pair-code').className = 'assist-message success';
+      el('pair-code').textContent = 'Seu código: ' + d.code;
+      toast('Código gerado. Digite no WhatsApp.');
+    } catch (e) { toast(e.message || 'Falha ao gerar código.', true); }
+  });
+  el('newqr-btn').addEventListener('click', async () => {
+    await fetch('/api/wa/logout', {method: 'POST'}).catch(() => {});
+    el('repair-wrap').classList.add('hidden');
+    toast('Sessão limpa. Aguarde o QR novo.');
+    setTimeout(waRefresh, 2500);
   });
   el('ml-connect').addEventListener('click', () => window.location.assign('/api/ml/start'));
   el('clear-btn').addEventListener('click', () => {
