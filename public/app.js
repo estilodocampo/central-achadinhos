@@ -8,6 +8,34 @@
     const n = el('toast'); n.textContent = msg; n.classList.toggle('error', err); n.classList.add('visible');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => n.classList.remove('visible'), 3500);
   }
+  const DRAFT = 'replicador-draft-v1';
+  let draftTimer = null;
+  function readDraft() { try { return JSON.parse(localStorage.getItem(DRAFT) || 'null') || null; } catch { return null; } }
+  function saveDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT, JSON.stringify({
+          adUrl: el('ad-url').value, platform: el('f-platform').value, title: el('f-title').value,
+          price: el('f-price').value, old: el('f-old').value, coupon: el('f-coupon').value,
+          link: el('f-link').value, image: el('f-image').value, message: el('message').value,
+          groups: [...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group)
+        }));
+      } catch {}
+    }, 250);
+  }
+  function restoreDraft() {
+    const d = readDraft();
+    if (!d) return false;
+    if (typeof d.adUrl === 'string') el('ad-url').value = d.adUrl;
+    if (typeof d.platform === 'string' && [...el('f-platform').options].some(o => o.value === d.platform || o.text === d.platform)) el('f-platform').value = d.platform;
+    for (const [id, key] of [['f-title', 'title'], ['f-price', 'price'], ['f-old', 'old'], ['f-coupon', 'coupon'], ['f-link', 'link'], ['f-image', 'image']]) {
+      if (typeof d[key] === 'string') el(id).value = d[key];
+    }
+    if (typeof d.message === 'string' && d.message) el('message').value = d.message;
+    return true;
+  }
+  function clearDraft() { try { localStorage.removeItem(DRAFT); } catch {} }
   const plainNumber = v => {
     if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : NaN;
     let x = String(v ?? '').trim().replace(/\s|R\$/gi, '');
@@ -76,11 +104,13 @@
       el('fetch-status').className = 'assist-message ' + (d.price != null ? 'success' : 'error');
       el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.');
       buildMessage();
+      saveDraft();
       toast(d.price != null ? 'Dados puxados. Revise e replique.' : 'Sem preço confirmado — complete manualmente.', d.price == null);
     } catch (e) {
       el('f-link').value = el('f-link').value || url;
       syncPlatformFromLink();
       buildMessage();
+      saveDraft();
       el('fetch-status').className = 'assist-message error';
       el('fetch-status').textContent = (e.message || 'Falha.') + ' Preencha manualmente.';
       toast('A loja não liberou os dados.', true);
@@ -119,6 +149,7 @@
   }
   let lastGroupsSig = '';
   let groupsFirstLoad = true;
+  const draftGroups = (() => { try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); return Array.isArray(d?.groups) ? d.groups : null; } catch { return null; } })();
   async function loadGroups(force = true) {
     const box = el('groups-list');
     try {
@@ -130,7 +161,7 @@
       const keep = new Set([...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group));
       lastGroupsSig = sig;
       box.innerHTML = groups.length ? groups.map(g => {
-        const checked = groupsFirstLoad ? true : keep.has(g.id);
+        const checked = groupsFirstLoad ? (draftGroups ? draftGroups.includes(g.id) : true) : keep.has(g.id);
         return '<label class="publish-item"><input type="checkbox" data-group="' + html(g.id) + '"' + (checked ? ' checked' : '') + '> <div style="min-width:0"><h4>' +
         html(g.name) + '</h4><p>' + g.size + ' participantes</p></div></label>';}).join('')
         : '<div class="empty"><strong>Nenhum grupo encontrado</strong><p>Conecte o WhatsApp e atualize.</p></div>';
@@ -163,7 +194,10 @@
     const t = {1: 'step-anuncio', 2: 'step-mensagem', 3: 'step-grupos'}[b.dataset.step];
     document.getElementById(t)?.scrollIntoView({behavior: 'smooth'});
   }));
-  ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link'].forEach(id => el(id).addEventListener('input', buildMessage));
+  ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
+  el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); });
+  el('message').addEventListener('input', saveDraft);
+  document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) saveDraft(); });
   el('fetch-btn').addEventListener('click', fetchPreview);
   el('ad-url').addEventListener('input', syncPlatformFromLink);
   el('ad-url').addEventListener('keydown', e => { if (e.key === 'Enter') fetchPreview(); });
@@ -180,8 +214,15 @@
     waRefresh();
   });
   el('ml-connect').addEventListener('click', () => window.location.assign('/api/ml/start'));
+  el('clear-btn').addEventListener('click', () => {
+    ['ad-url', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).value = '');
+    el('f-platform').selectedIndex = 0;
+    clearDraft(); buildMessage(); saveDraft();
+    toast('Campos limpos.');
+  });
   if (new URLSearchParams(window.location.search).get('ml') === 'connected') toast('Mercado Livre conectado para buscar preços.');
-  buildMessage();
+  const hadDraft = restoreDraft();
+  if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();
   waRefresh();
   clearInterval(waTimer);
   waTimer = setInterval(waRefresh, 5000);
