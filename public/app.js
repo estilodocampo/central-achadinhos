@@ -108,16 +108,24 @@
       el('wa-status').textContent = 'Servidor indisponível.';
     }
   }
+  let lastGroupsSig = '';
+  let groupsFirstLoad = true;
   async function loadGroups(force = true) {
     const box = el('groups-list');
     try {
       const r = await fetch('/api/wa/groups' + (force ? '?refresh=1' : ''), {cache: 'no-store'});
       const d = await r.json();
       const groups = d.groups || [];
-      box.innerHTML = groups.length ? groups.map(g =>
-        '<label class="publish-item"><input type="checkbox" data-group="' + html(g.id) + '" checked> <div style="min-width:0"><h4>' +
-        html(g.name) + '</h4><p>' + g.size + ' participantes</p></div></label>').join('')
+      const sig = groups.map(g => g.id).join('|');
+      if (!force && sig === lastGroupsSig) return;
+      const keep = new Set([...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group));
+      lastGroupsSig = sig;
+      box.innerHTML = groups.length ? groups.map(g => {
+        const checked = groupsFirstLoad ? true : keep.has(g.id);
+        return '<label class="publish-item"><input type="checkbox" data-group="' + html(g.id) + '"' + (checked ? ' checked' : '') + '> <div style="min-width:0"><h4>' +
+        html(g.name) + '</h4><p>' + g.size + ' participantes</p></div></label>';}).join('')
         : '<div class="empty"><strong>Nenhum grupo encontrado</strong><p>Conecte o WhatsApp e atualize.</p></div>';
+      groupsFirstLoad = false;
     } catch { box.innerHTML = '<div class="empty"><strong>Falha ao listar grupos</strong></div>'; }
   }
   function selectedGroups() {
