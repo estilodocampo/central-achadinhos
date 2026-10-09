@@ -17,7 +17,8 @@ test('normaliza ids: dedup, filtra e limita a 20', () => {
   assert.equal(normalizeGroupIds(many).length, 20);
 });
 
-test('classifyClose: sessão morta pede reparo, resto tenta de novo', () => {
+test('classifyClose: 515 pede retry rápido, sessão morta pede reparo', () => {
+  assert.equal(classifyClose(515), 'retry');
   assert.equal(classifyClose(401), 'repair');
   assert.equal(classifyClose(403), 'repair');
   assert.equal(classifyClose(411), 'repair');

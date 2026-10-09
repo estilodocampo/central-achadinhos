@@ -149,8 +149,7 @@
         pill.className = 'status-pill rascunho';
         st.className = 'assist-message error';
         st.textContent = (s.lastError ? s.lastError + ' ' : '') + 'Desconectado. Escaneie o QR para conectar sua conta.';
-        el('repair-wrap').classList.toggle('hidden', !s.lastError);
-        if (s.lastError) el('repair-msg').textContent = s.lastError;
+        el('repair-wrap').classList.add('hidden');
         if (s.qr) { el('qr-img').src = s.qr; el('qr-wrap').classList.remove('hidden'); }
         else el('qr-wrap').classList.add('hidden');
       }

@@ -74,9 +74,11 @@ function errCode(err) {
   return 0;
 }
 
+let lastCode = 0;
 function scheduleRetry() {
   if (retryTimer) return;
-  const wait = backoffFor(retries);
+  // 515 = restart exigido pelo WhatsApp: reconecta rápido; resto segue backoff.
+  const wait = lastCode === 515 ? 2000 : backoffFor(retries);
   retryTimer = setTimeout(() => { retryTimer = null; startWhatsApp().catch(() => {}); }, wait);
   if (retryTimer.unref) retryTimer.unref();
 }
@@ -146,6 +148,7 @@ async function boot() {
       } else if (u.connection === "close") {
         connected = false;
         const code = errCode(u.lastDisconnect?.error);
+        lastCode = code;
         retries++;
         lastErrorAt = Date.now();
         sock = null;
