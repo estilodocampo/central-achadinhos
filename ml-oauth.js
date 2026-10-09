@@ -73,6 +73,14 @@ export function getCookie(header,name){
   }
   return '';
 }
+// Espia SÓ o App ID pendente (público por natureza) para diagnóstico. Nunca o secret.
+export function peekPendingClient(cookieHeader,env=process.env){
+  try{
+    const p=unseal(getCookie(cookieHeader,STATE_COOKIE),env);
+    if(p&&p.client&&p.client.id)return {id:String(p.client.id)};
+  }catch{}
+  return null;
+}
 function cookie(name,value,maxAge,path='/'){
   return name+'='+value+'; Path='+path+'; Secure; HttpOnly; SameSite=Lax; Max-Age='+maxAge;
 }

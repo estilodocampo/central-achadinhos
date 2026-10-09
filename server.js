@@ -2,7 +2,7 @@
   const { createServer } = await import('node:http');
   const { extractProduct } = await import('./product-parser.js');
   const { officialMLPrice, publicMLPrice, matchPublicPriceByTitle } = await import('./mercadolivre-price.js');
-  const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri,validClientCreds } = await import('./ml-oauth.js');
+  const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri,validClientCreds,peekPendingClient } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem,matchingTitle} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct,userShopeeCreds} = await import('./shopee-affiliate.js');
   const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode,setClone,cloneStatus } = await import('./wa-gateway.js');
@@ -237,8 +237,13 @@
             error.message.includes('Autorização não foi concluída')?'denied':'unknown';
           const detail=(error.message.match(/codigo=([a-z_]{3,40})/)||[])[1]||'';
           const http=(error.message.match(/HTTP (\d{3})/)||[])[1]||'';
-          // Só códigos, nunca segredos ou tokens.
-          if(reason!=='unknown')console.warn('[ML_OAUTH] etapa='+reason+(http?', http='+http:'')+(detail?', codigo='+detail:', sem codigo do ML'));
+          // Só códigos e metadados públicos: nunca segredos, tokens ou o código em si.
+          let app='env', codeLen=0;
+          try{
+            app=peekPendingClient(req.headers.cookie,process.env)?.id||'env';
+            codeLen=String(new URL(req.url,`http://${req.headers.host||'localhost'}`).searchParams.get('code')||'').length;
+          }catch{}
+          if(reason!=='unknown')console.warn('[ML_OAUTH] etapa='+reason+(http?', http='+http:'')+(detail?', codigo='+detail:', sem codigo do ML')+', app='+app+', codeLen='+codeLen);
           res.writeHead(303,{'location':'/?ml=error&reason='+reason+(detail?'&detail='+detail:''),
             'cache-control':'no-store','referrer-policy':'no-referrer'});
           return res.end();
