@@ -113,6 +113,7 @@
       if (typeof d.price === 'number' && d.price > 0) el('f-price').value = d.price.toFixed(2).replace('.', ',');
       if (typeof d.oldPrice === 'number' && d.oldPrice > (d.price || 0)) el('f-old').value = d.oldPrice.toFixed(2).replace('.', ',');
       if (d.image) el('f-image').value = d.image;
+      updatePhotoPreview();
       if (!el('f-link').value || el('f-link').value === prevFetched) el('f-link').value = url;
       el('fetch-status').className = 'assist-message ' + (d.price != null ? 'success' : 'error');
       el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.')
@@ -136,6 +137,33 @@
     const url = el('ad-url').value.trim();
     if (!url || url === lastFetched || !platformForLink(url)) return;
     importTimer = setTimeout(() => fetchPreview(true), 600);
+  }
+  function updatePhotoPreview() {
+    const box = el('photo-preview');
+    if (!box) return;
+    let src = '';
+    try {
+      const u = new URL(el('f-image').value.trim());
+      if (u.protocol === 'https:' && !u.username && !u.password) src = u.href;
+    } catch {}
+    if (!src) {
+      box.classList.remove('broken');
+      box.innerHTML = '<span>🛍️</span>';
+      return;
+    }
+    if (box.dataset.src === src && box.querySelector('img')) return;
+    box.dataset.src = src;
+    box.classList.remove('broken');
+    box.innerHTML = '';
+    const img = document.createElement('img');
+    img.alt = 'Foto do produto';
+    img.loading = 'lazy';
+    img.src = src;
+    img.onerror = () => {
+      box.classList.add('broken');
+      box.innerHTML = 'Não consegui carregar a foto desse link. Confira a URL.';
+    };
+    box.appendChild(img);
   }
   async function copyText() {
     const v = el('message').value;
@@ -228,6 +256,7 @@
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
   el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); scheduleAutoImport(); });
   el('message').addEventListener('input', saveDraft);
+  el('f-image').addEventListener('input', () => { updatePhotoPreview(); saveDraft(); });
   document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) saveDraft(); });
   el('fetch-btn').addEventListener('click', fetchPreview);
   el('ad-url').addEventListener('input', syncPlatformFromLink);
@@ -395,6 +424,7 @@
   el('clear-btn').addEventListener('click', () => {
     ['ad-url', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).value = '');
     el('f-platform').selectedIndex = 0;
+    updatePhotoPreview();
     clearDraft(); buildMessage(); saveDraft();
     toast('Campos limpos.');
   });
@@ -412,6 +442,7 @@
   }
   const hadDraft = restoreDraft();
   if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();
+  updatePhotoPreview();
   mlConnectionStatus();
   waRefresh();
   clearInterval(waTimer);
