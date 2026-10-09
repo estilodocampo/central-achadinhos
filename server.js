@@ -249,17 +249,21 @@
         return send(res,200,{ok:true,connected:false},'application/json; charset=utf-8',false,{'set-cookie':clearSessionCookie()});
       }
       if(path==='/api/ml/diag'){
-        // Diagnóstico de rede: troca fictícia p/ ver se o ML responde com JSON
+        // Diagnóstico de rede: trocas fictícias p/ ver se o ML responde com JSON
         // (lógica OAuth alcançável) ou vazio (bloqueio de borda). Sem segredos.
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
         try{
-          const r=await fetch('https://api.mercadolibre.com/oauth/token',{method:'POST',
-            headers:{'content-type':'application/x-www-form-urlencoded','accept':'application/json'},
-            body:new URLSearchParams({grant_type:'refresh_token',client_id:'0',client_secret:'0',refresh_token:'0'}).toString(),
-            signal:AbortSignal.timeout(10000),redirect:'error'});
-          const t=await r.text();
-          return send(res,200,{http:r.status,len:t.length,
-            code:(t.match(/"error"\s*:\s*"([a-z_]{3,40})"/)||[])[1]||null});
+          const probe=async(body)=>{
+            const r=await fetch('https://api.mercadolibre.com/oauth/token',{method:'POST',
+              headers:{'content-type':'application/x-www-form-urlencoded','accept':'application/json'},
+              body:new URLSearchParams(body).toString(),
+              signal:AbortSignal.timeout(10000),redirect:'error'});
+            const t=await r.text();
+            return {http:r.status,len:t.length,code:(t.match(/"error"\s*:\s*"([a-z_]{3,40})"/)||[])[1]||null};
+          };
+          const refresh=await probe({grant_type:'refresh_token',client_id:'0',client_secret:'0',refresh_token:'0'});
+          const code=await probe({grant_type:'authorization_code',client_id:'0',client_secret:'0',code:'0',redirect_uri:'https://central-achadinhos.onrender.com/api/ml/callback'});
+          return send(res,200,{refresh,code});
         }catch(e){return send(res,200,{error:String(e?.message||e).slice(0,80)});}
       }
       if(path==='/api/integration-status')return send(res,200,{
