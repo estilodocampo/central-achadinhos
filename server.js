@@ -1,7 +1,7 @@
 (async function boot(){
   const { createServer } = await import('node:http');
   const { extractProduct } = await import('./product-parser.js');
-  const { officialMLPrice, publicMLPrice } = await import('./mercadolivre-price.js');
+  const { officialMLPrice, publicMLPrice, matchPublicPriceByTitle } = await import('./mercadolivre-price.js');
   const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem,matchingTitle} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct} = await import('./shopee-affiliate.js');
@@ -153,6 +153,15 @@
               }
             }
           }
+        }
+      }
+      if(mlPage&&(product.price===null||product.price===undefined)&&product.title){
+        // Vitrine/perfil sem ID único: confere candidatos pelo título oficial.
+        const match=await matchPublicPriceByTitle(html,product.title,matchingTitle);
+        if(match){
+          Object.assign(product,{price:match.price,oldPrice:match.oldPrice,
+            priceSource:match.priceSource,itemId:product.itemId||match.itemId});
+          trace.market='Mercado Livre';trace.identifier='item';trace.api='ok';
         }
       }
       return {...product,source:target.hostname,priceNote:priceNote(product),

@@ -47,3 +47,24 @@ export async function officialMLPrice(itemId,token=process.env.ML_ACCESS_TOKEN,r
     return decodeSalePrice(await response.json());
   }catch{return null;}
 }
+// Vitrine/perfil (ex: meli.la de vendedor): a página lista vários anúncios
+// sem ID único. Confere cada candidato pela API pública e só usa o preço
+// quando o título oficial bate com o da página. Nunca chuta.
+export async function matchPublicPriceByTitle(html, pageTitle, isMatch, request = fetch, limit = 6) {
+  const seen = new Set();
+  const ids = [];
+  for (const m of String(html || '').matchAll(/\bMLB-?(\d{7,14})\b/gi)) {
+    const id = 'MLB' + m[1];
+    if (!seen.has(id)) { seen.add(id); ids.push(id); }
+    if (ids.length >= limit) break;
+  }
+  if (!ids.length || !pageTitle) return null;
+  const found = await Promise.all(ids.map((id) => publicMLPrice(id, request)));
+  for (let i = 0; i < found.length; i++) {
+    const pub = found[i];
+    if (pub && isMatch(pageTitle, pub.title)) {
+      return {price: pub.price, oldPrice: pub.oldPrice, priceSource: pub.priceSource, itemId: ids[i]};
+    }
+  }
+  return null;
+}
