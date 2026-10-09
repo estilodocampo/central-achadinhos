@@ -19,6 +19,7 @@
           adUrl: el('ad-url').value, platform: el('f-platform').value, title: el('f-title').value,
           price: el('f-price').value, old: el('f-old').value, coupon: el('f-coupon').value,
           link: el('f-link').value, image: el('f-image').value, message: el('message').value,
+          autoSend: el('auto-send')?.checked === true,
           groups: [...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group)
         }));
       } catch {}
@@ -33,6 +34,7 @@
       if (typeof d[key] === 'string') el(id).value = d[key];
     }
     if (typeof d.message === 'string' && d.message) el('message').value = d.message;
+    if (el('auto-send')) el('auto-send').checked = d.autoSend === true;
     return true;
   }
   function clearDraft() { try { localStorage.removeItem(DRAFT); } catch {} }
@@ -244,6 +246,9 @@
   function selectedGroups() {
     return [...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group);
   }
+  function autoSendOn() {
+    return el('auto-send')?.checked === true;
+  }
   async function sendNow() {
     const msg = el('message').value.trim();
     const groups = selectedGroups();
@@ -275,10 +280,21 @@
   el('message').addEventListener('input', () => { updateBubble(); saveDraft(); });
   el('f-image').addEventListener('input', () => { updatePhotoPreview(); saveDraft(); });
   document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) saveDraft(); });
+  el('auto-send')?.addEventListener('change', saveDraft);
   el('fetch-btn').addEventListener('click', fetchPreview);
   el('ad-url').addEventListener('input', syncPlatformFromLink);
   el('ad-url').addEventListener('keydown', e => { if (e.key === 'Enter') fetchPreview(); });
-  el('build-btn').addEventListener('click', () => { buildMessage(); saveDraft(); toast('Mensagem pronta.'); showStep(2); });
+  el('build-btn').addEventListener('click', () => {
+    buildMessage(); saveDraft();
+    if (autoSendOn()) {
+      toast('Mensagem pronta. Enviando automaticamente…');
+      showStep(3);
+      sendNow();
+    } else {
+      toast('Mensagem pronta.');
+      showStep(2);
+    }
+  });
   el('copy-btn').addEventListener('click', copyText);
   el('to-groups-btn').addEventListener('click', () => showStep(3));
   el('wa-refresh').addEventListener('click', async () => { await waRefresh(); await loadGroups(true); });
