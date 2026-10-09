@@ -14,6 +14,23 @@ test('og:image de logo não inventa ID',()=>{
   const p=extractProduct(html,'https://www.mercadolivre.com.br/social/loja123');
   assert.equal(p.itemId,'');
 });
+test('social: âncora reserva usa o card com título igual ao og:title',()=>{
+  const card='{"title":{"text":"Calça Country Feminina"},"current_price":{"value":59.90,"currency":"BRL"}}';
+  const other='{"title":{"text":"Outro Produto"},"current_price":{"value":10.00,"currency":"BRL"}}';
+  const html='<meta property="og:title" content="Calça Country Feminina">'
+    +'<meta property="og:image" content="https://http2.mlstatic.com/D_NQ_NP_1-MLB999888777_1-O.webp">'
+    +'<div>meta MLB999888777</div>'+other+'<div>card MLB999888777</div>'+card;
+  const p=extractProduct(html,'https://www.mercadolivre.com.br/social/loja');
+  assert.equal(p.price,59.9);
+});
+test('social: âncora reserva recusa card com título diferente',()=>{
+  const other='{"title":{"text":"Outro Produto"},"current_price":{"value":10.00,"currency":"BRL"}}';
+  const html='<meta property="og:title" content="Calça Country Feminina">'
+    +'<meta property="og:image" content="https://http2.mlstatic.com/D_NQ_NP_1-MLB999888777_1-O.webp">'
+    +'<div>MLB999888777</div>'+other;
+  const p=extractProduct(html,'https://www.mercadolivre.com.br/social/loja');
+  assert.equal(p.price,null);
+});
 test('identifica preço em reais com pontuação brasileira',()=>{
   assert.equal(parseBRLPrice('R$ 1.234,90'),1234.9);
   assert.equal(parseBRLPrice('249,99'),249.99);

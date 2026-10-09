@@ -142,13 +142,38 @@ export function extractMercadoLivreSocial(html) {
   const normalized=normalize(title).toLocaleLowerCase('pt-BR');
   const anchors=[...page.matchAll(/"title"\s*:\s*\{\s*"text"\s*:\s*"([^"]{4,250})"/g)]
     .filter(m=>normalize(m[1]).toLocaleLowerCase('pt-BR')===normalized);
-  if(anchors.length!==1)return null;
-  // Limita a busca ao card compartilhado para não usar preços de recomendações.
-  const tail=page.slice(anchors[0].index,anchors[0].index+10000);
-  const nextTitle=/"title"\s*:\s*\{\s*"text"\s*:\s*"[^"]{4,250}"/g;
-  nextTitle.lastIndex=anchors[0][0].length;
-  const next=nextTitle.exec(tail);
-  const window=next ? tail.slice(0,next.index) : tail;
+  if(anchors.length===1){
+    // Limita a busca ao card compartilhado para não usar preços de recomendações.
+    const tail=page.slice(anchors[0].index,anchors[0].index+10000);
+    const nextTitle=/"title"\s*:\s*\{\s*"text"\s*:\s*"[^"]{4,250}"/g;
+    nextTitle.lastIndex=anchors[0][0].length;
+    const next=nextTitle.exec(tail);
+    const found=singlePrice(next ? tail.slice(0,next.index) : tail);
+    if(found)return found;
+  }
+  // Âncora reserva (modelo da loja): a foto og:image carrega o ID do anúncio
+  // (D_NQ_NP_...MLB...); o preço é lido só na janela desse card.
+  const ogImg=(page.match(/<meta\s+[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']/i)||[])[1]||'';
+  const imgId=(ogImg.match(/D_NQ_NP_[^"'?\s]*?MLB(\d{7,14})(?![0-9])/i)||[])[1]||'';
+  if(imgId){
+    let at=-1, tries=0;
+    while(tries<4 && (at=page.indexOf('MLB'+imgId,at+1))>=0){
+      tries++;
+      const window=page.slice(at,at+8000);
+      // O card precisa ser o do anúncio compartilhado (título igual ao og:title).
+      const cardTitle=(window.match(/"title"\s*:\s*\{\s*"text"\s*:\s*"([^"]{4,250})"/)||[])[1]||'';
+      if(normalize(cardTitle).toLocaleLowerCase('pt-BR')!==normalized)continue;
+      const nextTitle=/"title"\s*:\s*\{\s*"text"\s*:\s*"[^"]{4,250}"/g;
+      const firstLen=(window.match(/"title"\s*:\s*\{\s*"text"\s*:\s*"[^"]{4,250}"/)||[''])[0].length;
+      nextTitle.lastIndex=firstLen;
+      const next=nextTitle.exec(window);
+      const found=singlePrice(next?window.slice(0,next.index):window);
+      if(found)return found;
+    }
+  }
+  return null;
+}
+function singlePrice(window){
   const candidates=[...window.matchAll(/"current_price"\s*:\s*\{\s*"value"\s*:\s*"?([0-9]+(?:\.[0-9]{1,2})?)"?/g)];
   if(candidates.length!==1)return null;
   const candidate=candidates[0];
