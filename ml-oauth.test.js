@@ -132,3 +132,12 @@ test('erro do token expõe só o código OAuth sanitizado',async()=>{
     cookieValue(begin.cookie),env,async()=>({ok:false,status:400,json:async()=>({error:'invalid_client',error_description:'boom APP_USR-SECRET xyz'})})),
     /codigo=invalid_client/);
 });
+
+
+test('erro 400 sem corpo JSON gera mensagem sem codigo',async()=>{
+  const begin=createAuthorization(env);
+  const state=new URL(begin.url).searchParams.get('state');
+  await assert.rejects(()=>completeAuthorization({state,code:'ML-CODE-123456789'},
+    cookieValue(begin.cookie),env,async()=>({ok:false,status:400,json:async()=>{throw Error('vazio');}})),
+    /categoria=bad_request/);
+});

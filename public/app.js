@@ -404,7 +404,7 @@
     const msg = reason !== 'token' ? 'Falha ao conectar o Mercado Livre. Tente de novo.'
       : detail === 'invalid_client' ? 'Client Secret incorreto: copie de novo o Secret do seu app no painel de desenvolvedores ML e salve aqui.'
       : detail === 'invalid_grant' ? 'Código expirado ou já usado: clique em Conectar e autorize em seguida, sem demora.'
-      : 'O Mercado Livre recusou (HTTP 400). Confira o Secret, o redirect no seu app ML e conclua em poucos minutos.';
+      : 'O Mercado Livre recusou sem detalhar (HTTP 400). Confira o Secret e o redirect EXATO no seu app ML, tente de novo e me mande a linha [ML_OAUTH] do log no Render.';
     toast(msg, true);
     el('fetch-status').className = 'assist-message error';
     el('fetch-status').textContent = 'Conexão ML falhou (' + (detail || reason) + '). Sem ela, o preço de links de vitrine/perfil precisa ser manual.';

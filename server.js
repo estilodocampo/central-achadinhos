@@ -236,6 +236,9 @@
             error.message.includes('Código de autorização')?'code':
             error.message.includes('Autorização não foi concluída')?'denied':'unknown';
           const detail=(error.message.match(/codigo=([a-z_]{3,40})/)||[])[1]||'';
+          const http=(error.message.match(/HTTP (\d{3})/)||[])[1]||'';
+          // Só códigos, nunca segredos ou tokens.
+          if(reason!=='unknown')console.warn('[ML_OAUTH] etapa='+reason+(http?', http='+http:'')+(detail?', codigo='+detail:', sem codigo do ML'));
           res.writeHead(303,{'location':'/?ml=error&reason='+reason+(detail?'&detail='+detail:''),
             'cache-control':'no-store','referrer-policy':'no-referrer'});
           return res.end();
