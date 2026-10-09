@@ -69,8 +69,20 @@
 
     <section class="panel form-panel hidden" id="step-mensagem">
       <div class="panel-head"><div><h3>💬 2. Mensagem</h3><p>Revise antes de replicar. Edite à vontade.</p></div></div>
-      <textarea id="message" rows="11" aria-label="Mensagem de divulgação"></textarea>
-      <div class="composer-actions"><button type="button" class="btn btn-outline" data-step="1">← Voltar</button><button type="button" id="copy-btn" class="btn btn-outline">Copiar texto</button><button type="button" id="to-groups-btn" class="btn btn-primary">Escolher grupos ↓</button></div>
+      <div class="msg-grid">
+        <div class="msg-editor">
+          <textarea id="message" rows="14" aria-label="Mensagem de divulgação"></textarea>
+          <div class="msg-meta"><span id="msg-count">0 caracteres</span></div>
+          <div class="composer-actions"><button type="button" class="btn btn-outline" data-step="1">← Voltar</button><button type="button" id="copy-btn" class="btn btn-outline">Copiar texto</button><button type="button" id="to-groups-btn" class="btn btn-primary">Escolher grupos ↓</button></div>
+        </div>
+        <div class="msg-phone">
+          <div class="phone-screen">
+            <div class="phone-header"><span class="phone-avatar">🛍️</span><span class="phone-name">Seu grupo VIP<small>online</small></span></div>
+            <div class="phone-chat"><div class="wa-bubble" id="wa-bubble"></div><div class="wa-time"><span id="wa-clock">agora</span> ✓✓</div></div>
+          </div>
+          <p class="tiny-warning">Prévia fiel de como a mensagem chega no WhatsApp.</p>
+        </div>
+      </div>
     </section>
 
     <section class="panel form-panel hidden" id="step-grupos">

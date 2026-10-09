@@ -80,6 +80,7 @@
     if (link) m += '\n\n🛒 *Veja a oferta:*\n' + link;
     m += '\n\n⚠️ Preço e disponibilidade sujeitos a alteração.\n🔗 Link de afiliado.';
     el('message').value = m;
+    updateBubble();
   }
   let importTimer = null;
   let importSerial = 0;
@@ -165,6 +166,18 @@
       box.innerHTML = 'Não consegui carregar a foto desse link. Confira a URL.';
     };
     box.appendChild(img);
+  }
+  function updateBubble() {
+    const b = el('wa-bubble');
+    if (!b) return;
+    const v = el('message').value;
+    const c = el('msg-count');
+    if (c) c.textContent = v.length + ' caracteres';
+    b.innerHTML = v.trim()
+      ? html(v).replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+      : '<span class="wa-empty">A mensagem aparece aqui…</span>';
+    const clock = el('wa-clock');
+    if (clock) clock.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
   }
   async function copyText() {
     const v = el('message').value;
@@ -259,7 +272,7 @@
   document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => showStep(b.dataset.step)));
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
   el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); scheduleAutoImport(); });
-  el('message').addEventListener('input', saveDraft);
+  el('message').addEventListener('input', () => { updateBubble(); saveDraft(); });
   el('f-image').addEventListener('input', () => { updatePhotoPreview(); saveDraft(); });
   document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) saveDraft(); });
   el('fetch-btn').addEventListener('click', fetchPreview);
@@ -445,7 +458,7 @@
     el('fetch-status').textContent = 'Conexão ML falhou (' + (detail || reason) + '). Sem ela, o preço de links de vitrine/perfil precisa ser manual.';
   }
   const hadDraft = restoreDraft();
-  if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();
+  if (!hadDraft || !el('message').value) buildMessage(); else { saveDraft(); updateBubble(); }
   updatePhotoPreview();
   showStep(0);
   mlConnectionStatus();

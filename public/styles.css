@@ -10,3 +10,20 @@
 .photo-preview{margin-top:10px;min-height:120px;max-height:260px;border:1px dashed #c6d2dd;border-radius:12px;display:grid;place-items:center;overflow:hidden;background:#eef3f7;font-size:44px}
 .photo-preview img{width:100%;height:100%;max-height:260px;object-fit:contain;background:#fff}
 .photo-preview.broken{font-size:13px;color:#84909d;padding:14px;text-align:center}
+
+
+.msg-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:22px;align-items:start}
+.msg-editor textarea{width:100%;min-height:300px;resize:vertical}
+.msg-meta{font-size:11px;color:#84909d;margin:8px 2px 0;text-align:right}
+.msg-phone{position:sticky;top:16px}
+.phone-screen{border-radius:22px;overflow:hidden;border:1px solid #d5dde4;background:#0b141a;box-shadow:0 12px 34px rgba(19,38,63,.14);max-width:340px;margin:0 auto}
+.phone-header{display:flex;align-items:center;gap:10px;background:#1f2c34;color:#fff;padding:10px 14px}
+.phone-avatar{width:34px;height:34px;border-radius:50%;background:#f4a828;display:grid;place-items:center;font-size:19px}
+.phone-name{font-weight:700;font-size:13px;display:flex;flex-direction:column}
+.phone-name small{font-weight:400;font-size:11px;color:#9db3c0}
+.phone-chat{background:#e5ddd5 url('');padding:16px 12px 12px;min-height:280px}
+.wa-bubble{background:#fff;border-radius:10px;border-top-left-radius:0;padding:10px 12px;font-size:13.5px;line-height:1.5;color:#111b21;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 1px rgba(0,0,0,.18);position:relative}
+.wa-bubble:before{content:'';position:absolute;top:0;left:-8px;border:8px solid transparent;border-top-color:#fff;border-left:0}
+.wa-bubble .wa-empty{color:#84909d;font-style:italic}
+.wa-time{text-align:right;font-size:10.5px;color:#667781;margin-top:3px}
+@media(max-width:900px){.msg-grid{grid-template-columns:1fr}.msg-phone{position:static}}
