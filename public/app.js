@@ -96,7 +96,12 @@
     el('fetch-status').className = 'assist-message';
     el('fetch-status').textContent = 'Consultando dados públicos…';
     try {
-      const r = await fetch('/api/preview', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({url})});
+      const payload = {url};
+      const sc = shopeeCreds();
+      if (sc) { payload.shopeeAppId = sc.id; payload.shopeeAppSecret = sc.secret; }
+      const tc = readCreds(TIKTOK_CREDS);
+      if (tc?.key && tc?.secret) { payload.tiktokAppKey = String(tc.key).slice(0, 64); payload.tiktokAppSecret = String(tc.secret).slice(0, 256); }
+      const r = await fetch('/api/preview', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload)});
       const d = await r.json();
       if (serial !== importSerial) return;
       if (!r.ok) throw new Error(d.error || 'Prévia indisponível.');
@@ -109,7 +114,8 @@
       if (d.image) el('f-image').value = d.image;
       if (!el('f-link').value) el('f-link').value = url;
       el('fetch-status').className = 'assist-message ' + (d.price != null ? 'success' : 'error');
-      el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.');
+      el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.')
+        + (d.shopeeSource === 'navegador' ? ' (usando SUA chave Shopee)' : '');
       buildMessage();
       saveDraft();
       toast(d.price != null ? 'Dados puxados. Revise e replique.' : 'Sem preço confirmado — complete manualmente.', d.price == null);
@@ -264,10 +270,55 @@
     } catch { toast('Não foi possível desconectar.', true); }
     mlConnectionStatus();
   });
-  el('shopee-help').addEventListener('click', () => {
-    toast('No Render: Environment → SHOPEE_APP_ID e SHOPEE_APP_SECRET do app de afiliados Shopee.');
-    el('shopee-hint').textContent = 'No Render, em Environment, cadastre SHOPEE_APP_ID e SHOPEE_APP_SECRET (painel de afiliados Shopee). Depois aguarde o redeploy.';
+  const SHOPEE_CREDS = 'shopee-creds-v1';
+  const TIKTOK_CREDS = 'tiktok-creds-v1';
+  function readCreds(key) { try { return JSON.parse(localStorage.getItem(key) || 'null') || null; } catch { return null; } }
+  function shopeeCreds() {
+    const c = readCreds(SHOPEE_CREDS);
+    if (c && /^\d{3,32}$/.test(String(c.id || '')) && String(c.secret || '').length >= 8) return {id: String(c.id), secret: String(c.secret)};
+    return null;
+  }
+  function refreshShopeeStatus(server) {
+    const mine = shopeeCreds();
+    el('shopee-status').textContent = mine
+      ? 'Conectado com SUA chave neste navegador.'
+      : server ? 'Conectado via chave do servidor.' : 'Sem chave: preços Shopee sem confirmação oficial.';
+  }
+  el('shopee-save').addEventListener('click', () => {
+    const id = el('shopee-id').value.trim(), secret = el('shopee-secret').value.trim();
+    if (!/^\d{3,32}$/.test(id)) return toast('App ID inválido (só números).', true);
+    if (secret.length < 8 || secret.length > 256) return toast('App Secret inválido.', true);
+    try { localStorage.setItem(SHOPEE_CREDS, JSON.stringify({id, secret})); } catch {}
+    el('shopee-secret').value = '';
+    toast('Chaves Shopee salvas neste navegador.');
+    refreshShopeeStatus(el('shopee-status').dataset.server === '1');
   });
+  el('shopee-clear').addEventListener('click', () => {
+    try { localStorage.removeItem(SHOPEE_CREDS); } catch {}
+    el('shopee-id').value = ''; el('shopee-secret').value = '';
+    toast('Chaves Shopee apagadas.');
+    refreshShopeeStatus(el('shopee-status').dataset.server === '1');
+  });
+  el('tiktok-save').addEventListener('click', () => {
+    const key = el('tiktok-key').value.trim(), secret = el('tiktok-secret').value.trim();
+    if (!key || secret.length < 8) return toast('Preencha App Key e um Secret válido.', true);
+    try { localStorage.setItem(TIKTOK_CREDS, JSON.stringify({key, secret})); } catch {}
+    el('tiktok-secret').value = '';
+    el('tiktok-status').textContent = 'Chaves salvas neste navegador. Ativação na API oficial do TikTok.';
+    toast('Chaves TikTok salvas neste navegador.');
+  });
+  el('tiktok-clear').addEventListener('click', () => {
+    try { localStorage.removeItem(TIKTOK_CREDS); } catch {}
+    el('tiktok-key').value = ''; el('tiktok-secret').value = '';
+    el('tiktok-status').textContent = 'Extração direta da página, sempre ativa.';
+    toast('Chaves TikTok apagadas.');
+  });
+  (function fillCredFields() {
+    const s = readCreds(SHOPEE_CREDS);
+    if (s?.id) el('shopee-id').value = s.id;
+    const t = readCreds(TIKTOK_CREDS);
+    if (t?.key) { el('tiktok-key').value = t.key; el('tiktok-status').textContent = 'Chaves salvas neste navegador. Ativação na API oficial do TikTok.'; }
+  })();
   async function mlConnectionStatus() {
     const st = el('ml-status'), c = el('ml-connect'), d = el('ml-disconnect');
     try {
@@ -288,9 +339,9 @@
     try {
       const r = await fetch('/api/integration-status', {cache: 'no-store'});
       const s = await r.json();
-      el('shopee-status').textContent = (s.shopee?.appIdConfigured && s.shopee?.appSecretConfigured)
-        ? 'Conectado via chave do app. Preços oficiais ativos.'
-        : 'Não conectado. Cadastre a chave no Render (botão abaixo).';
+      const server = Boolean(s.shopee?.appIdConfigured && s.shopee?.appSecretConfigured);
+      el('shopee-status').dataset.server = server ? '1' : '';
+      refreshShopeeStatus(server);
     } catch { el('shopee-status').textContent = 'Não foi possível verificar.'; }
   }
   el('clear-btn').addEventListener('click', () => {

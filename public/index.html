@@ -19,7 +19,7 @@
       <button class="nav-btn" data-step="2"><span class="nav-emoji">💬</span> 2. Mensagem</button>
       <button class="nav-btn" data-step="3"><span class="nav-emoji">↗</span> 3. Grupos</button>
     </nav>
-    <div class="sidebar-bottom"><span class="online-dot"></span> Replicador <span class="ver">v1.3.0</span><p>Nada é salvo. Conecte o WhatsApp, monte a mensagem e replique.</p></div>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Replicador <span class="ver">v1.5.0</span><p>Nada é salvo. Conecte o WhatsApp, monte a mensagem e replique.</p></div>
   </aside>
 
   <main class="main-content">
@@ -33,16 +33,20 @@
       <div class="dashboard-grid">
         <div class="panel">
           <div class="panel-head"><div><h3>💛 Mercado Livre</h3><p id="ml-status">Verificando…</p></div></div>
+          <p class="tiny-warning">Cada usuário conecta a própria conta (ideal para revender o painel).</p>
           <div class="composer-actions"><button type="button" id="ml-connect" class="btn btn-primary">Conectar</button><button type="button" id="ml-disconnect" class="btn btn-outline">Desconectar</button></div>
         </div>
         <div class="panel">
           <div class="panel-head"><div><h3>🧡 Shopee</h3><p id="shopee-status">Verificando…</p></div></div>
-          <p class="tiny-warning" id="shopee-hint">A Shopee usa chave do app, sem botão de login.</p>
-          <div class="composer-actions"><button type="button" id="shopee-help" class="btn btn-outline">Como conectar</button></div>
+          <div class="form-row"><label class="field"><span>Seu App ID</span><input id="shopee-id" inputmode="numeric" maxlength="32" autocomplete="off" placeholder="Só números"></label><label class="field"><span>Seu App Secret</span><input id="shopee-secret" type="password" maxlength="256" autocomplete="off" placeholder="Cole do portal de afiliados"></label></div>
+          <p class="tiny-warning">Cada cliente usa a própria chave, salva só neste navegador. Sem chave aqui, vale a do servidor.</p>
+          <div class="composer-actions"><button type="button" id="shopee-save" class="btn btn-primary">Salvar chaves</button><button type="button" id="shopee-clear" class="btn btn-outline">Apagar</button></div>
         </div>
         <div class="panel">
           <div class="panel-head"><div><h3>🎵 TikTok Shop</h3><p id="tiktok-status">Extração direta da página, sempre ativa.</p></div></div>
-          <p class="tiny-warning">O TikTok não tem API pública de afiliados: título e foto vêm da página e o preço precisa de conferência manual.</p>
+          <div class="form-row"><label class="field"><span>Seu App Key <small>opcional</small></span><input id="tiktok-key" maxlength="64" autocomplete="off" placeholder="Quando tiver app aprovado"></label><label class="field"><span>Seu App Secret <small>opcional</small></span><input id="tiktok-secret" type="password" maxlength="256" autocomplete="off" placeholder="Quando tiver app aprovado"></label></div>
+          <p class="tiny-warning">A API oficial exige app aprovado pelo TikTok por vendedor. Enquanto isso, título e foto vêm da página; o preço precisa de conferência. Chaves salvas só neste navegador.</p>
+          <div class="composer-actions"><button type="button" id="tiktok-save" class="btn btn-primary">Salvar chaves</button><button type="button" id="tiktok-clear" class="btn btn-outline">Apagar</button></div>
         </div>
       </div>
     </section>
@@ -83,7 +87,7 @@
         <p class="tiny-warning">Envio automático pela sua conta. Comece com poucos grupos para evitar bloqueio. Nenhum dado é salvo no servidor.</p>
       </div>
     </section>
-    <footer class="footer">Replicador <b>v1.3</b> <span>•</span> Nada é salvo. Painel independente.</footer>
+    <footer class="footer">Replicador <b>v1.5</b> <span>•</span> Nada é salvo. Painel independente.</footer>
   </main>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

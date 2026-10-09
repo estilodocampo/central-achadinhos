@@ -2,6 +2,19 @@ import {createHash} from 'node:crypto';
 import {extractProduct, parseBRLPrice} from './product-parser.js';
 
 export const SHOPEE_GRAPHQL='https://open-api.affiliate.shopee.com.br/graphql';
+// Credenciais do PRÓPRIO usuário (painel comercial): valida formato sem
+// aceitar lixo. Devolve {appId,secret} ou null (usar chave do servidor).
+export function userShopeeCreds(body) {
+  if (!body || typeof body !== 'object') return null;
+  const hasId = body.shopeeAppId !== undefined && body.shopeeAppId !== null && String(body.shopeeAppId) !== '';
+  const hasSecret = body.shopeeAppSecret !== undefined && body.shopeeAppSecret !== null && String(body.shopeeAppSecret) !== '';
+  if (!hasId && !hasSecret) return null;
+  const appId = String(body.shopeeAppId ?? '').trim();
+  const secret = String(body.shopeeAppSecret ?? '').trim();
+  if (!/^\d{3,32}$/.test(appId)) throw Error('App ID Shopee inválido.');
+  if (secret.length < 8 || secret.length > 256 || /[\s<>]/.test(secret)) throw Error('App Secret Shopee inválido.');
+  return {appId, secret};
+}
 function cleanId(value){
   const n=String(value ?? '').trim();
   return /^\d{4,20}$/.test(n)?n:'';

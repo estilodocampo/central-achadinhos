@@ -1,4 +1,12 @@
-# Central de Achadinhos — Replicador v1.4.0
+# Central de Achadinhos — Replicador v1.5.0 (modo comercial)
+
+Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — cada cliente conecta as próprias contas no painel.
+
+## Conexões por cliente (painel)
+
+- **Mercado Livre**: botão Conectar (OAuth). Cada usuário autoriza com a própria conta; token fica no cookie do navegador dele.
+- **Shopee**: campos App ID + App Secret salvos no navegador (`localStorage`) e enviados por busca; o servidor prefere a chave do cliente e usa a do servidor como reserva. Nada é registrado em log.
+- **TikTok Shop**: campos App Key + Secret salvos no navegador (prontos para a API oficial quando o app do vendedor for aprovado). Hoje a extração é direta da página.
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — só o login do WhatsApp é guardado (como "manter conectado"), igual à loja.
 

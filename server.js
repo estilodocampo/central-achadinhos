@@ -4,14 +4,14 @@
   const { officialMLPrice, publicMLPrice, matchPublicPriceByTitle } = await import('./mercadolivre-price.js');
   const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem,matchingTitle} = await import('./mercadolivre-catalog.js');
-  const {parseShopeeIds,officialShopeeProduct} = await import('./shopee-affiliate.js');
+  const {parseShopeeIds,officialShopeeProduct,userShopeeCreds} = await import('./shopee-affiliate.js');
   const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode } = await import('./wa-gateway.js');
   const { readFile, stat } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
-  const VERSION='1.4.0';
+  const VERSION='1.5.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
   function marketUrl(input) {
     const u=new URL(input);
@@ -20,7 +20,7 @@
     if(!MARKETS.some(m=>h===m||h.endsWith('.'+m))) throw Error('Este link não é de Shopee, Mercado Livre ou TikTok Shop.');
     return u;
   }
-  async function getPreview(link,mlToken=''){
+  async function getPreview(link,mlToken='',shopeeCreds=null){
     let target=marketUrl(link);
     const hops=[target.href];
     let trace={market:'',identifier:'unknown',api:'not_attempted',configured:false};
@@ -42,8 +42,8 @@
     for(let i=0;i<6;i++){
       const shopeeIds=parseShopeeIds(target.href);
       if(shopeeIds){
-        const official=await officialShopeeProduct(shopeeIds);
-        if(official)return {...official,itemId:shopeeIds.itemId,source:official.source||target.hostname};
+        const official=await officialShopeeProduct(shopeeIds,shopeeCreds||{});
+        if(official)return {...official,itemId:shopeeIds.itemId,source:official.source||target.hostname,shopeeSource:shopeeCreds?'navegador':'servidor'};
       }
       const direct=mercadoIdsFromPage('',target.href,hops);
       const directIsML=Boolean(direct.itemId||direct.catalogId);
@@ -109,8 +109,8 @@
       const canonical=html.match(/<meta\s+[^>]*(?:property|name)=["']og:url["'][^>]*content=["']([^"']+)["']/i)?.[1]||'';
       const canonicalIds=parseShopeeIds(canonical);
       if(canonicalIds){
-        const verified=await officialShopeeProduct(canonicalIds);
-        if(verified)return {...verified,itemId:canonicalIds.itemId,source:verified.source||target.hostname};
+        const verified=await officialShopeeProduct(canonicalIds,shopeeCreds||{});
+        if(verified)return {...verified,itemId:canonicalIds.itemId,source:verified.source||target.hostname,shopeeSource:shopeeCreds?'navegador':'servidor'};
       }
       const mlPage=/mercadolivre|mercadolibre|meli\.la/i.test(hops.join(' '));
       if(mlPage){
@@ -245,8 +245,10 @@
         let body;
         try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return send(res,400,{error:'JSON inválido.'});}
         if(typeof body.url!=='string'||body.url.length>2000)return send(res,400,{error:'Link inválido.'});
+        let shopeeCreds=null;
+        try{shopeeCreds=userShopeeCreds(body);}catch(e){return send(res,400,{error:e?.message||'Credenciais Shopee inválidas.'});}
         try{const auth=await getAuthorizedToken(req.headers.cookie);
-          return send(res,200,await getPreview(body.url,auth.token||''),'application/json; charset=utf-8',false,auth.cookie?{'set-cookie':auth.cookie}:{});}
+          return send(res,200,await getPreview(body.url,auth.token||'',shopeeCreds),'application/json; charset=utf-8',false,auth.cookie?{'set-cookie':auth.cookie}:{});}
         catch(e){return send(res,422,{error:e?.message||'Prévia indisponível.'});}
       }
       if(path==='/api/wa/status'){

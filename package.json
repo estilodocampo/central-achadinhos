@@ -1,6 +1,6 @@
 {
   "name": "central-achadinhos",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "Replicador de anúncios de afiliados para grupos de WhatsApp. Só a sessão de login é guardada; ofertas nunca são salvas.",
