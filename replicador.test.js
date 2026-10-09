@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isGroupJid, normalizeGroupIds, validateSend, classifyClose, backoffFor, shouldClone} from './wa-gateway.js';
+import {isGroupJid, normalizeGroupIds, validateSend, classifyClose, backoffFor, shouldClone, matchPairs} from './wa-gateway.js';
 
 test('jid de grupo válido e inválido', () => {
   assert.equal(isGroupJid('120363123456@g.us'), true);
@@ -45,10 +45,14 @@ test('validateSend recusa mensagem vazia, longa ou sem grupo', () => {
 
 test('shouldClone aceita texto e foto do grupo origem',()=>{
   const cfg={enabled:true,from:'120363000001@g.us',to:'120363000002@g.us'};
-  assert.deepEqual(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:' Promo '}},cfg),{kind:'text',text:' Promo '});
+  const job=shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:' Promo '}},cfg);
+  assert.equal(job.kind,'text');
+  assert.equal(job.text,' Promo ');
+  assert.equal(job.to,'120363000002@g.us');
   const img=shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{imageMessage:{caption:'Oferta'}}},cfg);
   assert.equal(img.kind,'image');
   assert.equal(img.caption,'Oferta');
+  assert.equal(img.to,'120363000002@g.us');
 });
 test('shouldClone barra loop, outro grupo e tipos do sistema',()=>{
   const cfg={enabled:true,from:'120363000001@g.us',to:'120363000002@g.us'};
@@ -58,4 +62,15 @@ test('shouldClone barra loop, outro grupo e tipos do sistema',()=>{
   assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{stickerMessage:{}}},cfg),null);
   assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:'x'}},{...cfg,enabled:false}),null);
   assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:'x'}},{enabled:true,from:'120363000001@g.us',to:'120363000001@g.us'}),null);
+});
+test('pares independentes: cada origem vai ao próprio destino',()=>{
+  const cfg={pairs:[
+    {id:'p1',from:'120363000001@g.us',to:'120363000002@g.us',enabled:true},
+    {id:'p2',from:'120363000003@g.us',to:'120363000004@g.us',enabled:false},
+  ]};
+  const j1=shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:'oi'}},cfg);
+  assert.equal(j1.to,'120363000002@g.us');
+  assert.equal(j1.pairId,'p1');
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000003@g.us'},message:{conversation:'oi'}},cfg),null);
+  assert.deepEqual(matchPairs({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{}},cfg).map(p=>p.id),['p1']);
 });

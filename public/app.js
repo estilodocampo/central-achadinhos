@@ -333,14 +333,21 @@
   el('select-all').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = true));
   el('select-none').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = false));
   el('send-btn').addEventListener('click', sendNow);
+  const CLONE_IDS = [1, 2];
   function fillCloneSelects(groups) {
-    for (const id of ['clone-from', 'clone-to']) {
-      const sel = el(id);
-      const keep = sel.value;
-      sel.innerHTML = '<option value="">Escolha o grupo…</option>' + groups.map(g =>
-        '<option value="' + html(g.id) + '">' + html(g.name) + ' (' + g.size + ')</option>').join('');
-      if (keep) sel.value = keep;
+    for (const n of CLONE_IDS) {
+      for (const id of ['clone-from-' + n, 'clone-to-' + n]) {
+        const sel = el(id);
+        if (!sel) continue;
+        const keep = sel.value;
+        sel.innerHTML = '<option value="">Escolha o grupo…</option>' + groups.map(g =>
+          '<option value="' + html(g.id) + '">' + html(g.name) + ' (' + g.size + ')</option>').join('');
+        if (keep) sel.value = keep;
+      }
     }
+  }
+  function groupName(groups, id) {
+    return ((groups || []).find(x => x.id === id) || {}).name || id;
   }
   async function refreshClone() {
     const st = el('clone-status');
@@ -350,27 +357,38 @@
         fetch('/api/wa/clone', {cache: 'no-store'}).then(r => r.json()).catch(() => ({}))
       ]);
       fillCloneSelects(g.groups || []);
-      if (c.from) el('clone-from').value = c.from;
-      if (c.to) el('clone-to').value = c.to;
-      el('clone-on').checked = c.enabled === true;
+      const pairs = Array.isArray(c.pairs) && c.pairs.length ? c.pairs : [{}, {}];
+      // Compat: resposta antiga de par único.
+      if (!Array.isArray(c.pairs) && (c.from || c.to)) pairs[0] = {from: c.from, to: c.to, enabled: c.enabled, cloned: c.cloned};
+      let anyOn = false;
+      CLONE_IDS.forEach((n, i) => {
+        const p = pairs[i] || {};
+        if (p.from) el('clone-from-' + n).value = p.from;
+        if (p.to) el('clone-to-' + n).value = p.to;
+        el('clone-on-' + n).checked = p.enabled === true;
+        if (p.enabled) anyOn = true;
+        el('clone-stats-' + n).textContent = p.enabled
+          ? ('Ligado • ' + (p.cloned || 0) + ' replicadas')
+          : ((p.cloned || 0) ? (p.cloned + ' replicadas (desligado)') : '');
+      });
       if (c.affiliate) {
         if (c.affiliate.mlTool) el('aff-ml-tool').value = c.affiliate.mlTool;
         if (c.affiliate.mlWord) el('aff-ml-word').value = c.affiliate.mlWord;
         el('aff-shopee-convert').checked = c.affiliate.shopeeConvert === true;
       }
-      st.className = 'assist-message ' + (c.enabled ? 'success' : '');
-      st.textContent = c.enabled
-        ? ('Ligado: clonando para ' + (((g.groups || []).find(x => x.id === c.to) || {}).name || c.to) + ' • ' + (c.cloned || 0) + ' replicadas.')
-        : 'Desligado. Escolha origem e destino, ligue e salve.';
+      st.className = 'assist-message ' + (anyOn ? 'success' : '');
+      st.textContent = anyOn ? 'Clonagem ativa.' : 'Tudo desligado. Configure um par, ligue e salve.';
     } catch { st.textContent = 'Não foi possível carregar.'; }
   }
   el('clone-save').addEventListener('click', async () => {
     try {
       const r = await fetch('/api/wa/clone', {method: 'POST', headers: {'content-type': 'application/json'},
-        body: JSON.stringify({from: el('clone-from').value, to: el('clone-to').value, enabled: el('clone-on').checked})});
+        body: JSON.stringify({pairs: CLONE_IDS.map(n => ({id: 'p' + n,
+          from: el('clone-from-' + n).value, to: el('clone-to-' + n).value, enabled: el('clone-on-' + n).checked}))})});
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha.');
-      toast(d.enabled ? 'Clonador ligado!' : 'Clonador salvo (desligado).');
+      const on = (d.pairs || []).filter(p => p.enabled).length;
+      toast(on ? ('Clonador ligado em ' + on + ' par(es)!') : 'Clonador salvo (desligado).');
       refreshClone();
     } catch (e) { toast(e.message || 'Falha ao salvar.', true); }
   });

@@ -178,9 +178,17 @@ export function startWhatsApp() {
   return boot().catch(() => sock);
 }
 
-// ---------- Clonador de grupos ----------
-const clone = {enabled: false, from: "", to: "", cloned: 0, lastAt: 0, lastError: "",
+// ---------- Clonador de grupos (pares independentes) ----------
+const clone = {pairs: [], lastError: "",
   aff: {mlTool: "", mlWord: "", shopeeConvert: false, shopeeId: "", shopeeSecret: ""}};
+const MAX_PAIRS = 4;
+function cleanPair(p, i) {
+  const id = String(p?.id || "p" + (i + 1)).slice(0, 12);
+  const from = isGroupJid(p?.from) ? String(p.from) : "";
+  const to = isGroupJid(p?.to) ? String(p.to) : "";
+  return {id, from, to, enabled: p?.enabled === true && Boolean(from && to && from !== to),
+    cloned: Number(p?.cloned) || 0, lastAt: Number(p?.lastAt) || 0};
+}
 let cloneLoaded = false;
 async function loadClone() {
   if (cloneLoaded) return;
@@ -188,11 +196,12 @@ async function loadClone() {
   try {
     const c = await getCfg("clone");
     if (c && typeof c === "object") {
-      clone.enabled = c.enabled === true;
-      clone.from = isGroupJid(c.from) ? c.from : "";
-      clone.to = isGroupJid(c.to) ? c.to : "";
-      clone.cloned = Number(c.cloned) || 0;
-      clone.lastAt = Number(c.lastAt) || 0;
+      if (Array.isArray(c.pairs)) {
+        clone.pairs = c.pairs.slice(0, MAX_PAIRS).map(cleanPair);
+      } else if (c.from || c.to) {
+        // Migra config antiga de par único.
+        clone.pairs = [cleanPair({id: "p1", from: c.from, to: c.to, enabled: c.enabled, cloned: c.cloned, lastAt: c.lastAt}, 0)];
+      }
       if (c.aff && typeof c.aff === "object") {
         clone.aff.mlTool = /^\d{4,20}$/.test(String(c.aff.mlTool || "")) ? String(c.aff.mlTool) : "";
         clone.aff.mlWord = /^[A-Za-z0-9._-]{2,60}$/.test(String(c.aff.mlWord || "")) ? String(c.aff.mlWord) : "";
@@ -201,55 +210,71 @@ async function loadClone() {
         clone.aff.shopeeSecret = String(c.aff.shopeeSecret || "").length >= 8 ? String(c.aff.shopeeSecret) : "";
         if (!clone.aff.shopeeId || !clone.aff.shopeeSecret) { clone.aff.shopeeConvert = false; clone.aff.shopeeId = ""; clone.aff.shopeeSecret = ""; }
       }
-      if (!clone.from || !clone.to || clone.from === clone.to) clone.enabled = false;
     }
   } catch {}
 }
+// Compat: config antiga de par único vira {pairs:[...]}.
+function asPairs(cfg) {
+  if (!cfg || typeof cfg !== "object") return [];
+  if (Array.isArray(cfg.pairs)) return cfg.pairs;
+  if (cfg.from || cfg.to) return [{id: "p1", from: cfg.from, to: cfg.to, enabled: cfg.enabled}];
+  return [];
+}
 function saveClone() {
-  setCfg("clone", {enabled: clone.enabled, from: clone.from, to: clone.to, cloned: clone.cloned, lastAt: clone.lastAt,
+  setCfg("clone", {pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt})),
     aff: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord, shopeeConvert: clone.aff.shopeeConvert,
       shopeeId: clone.aff.shopeeId, shopeeSecret: clone.aff.shopeeSecret}}).catch(() => {});
 }
 // Decisão pura/testável: só texto e foto, nunca as próprias mensagens (anti-loop).
+// Aceita config nova {pairs:[...]} ou antiga {from,to,enabled}. Devolve to+pairId.
 export function shouldClone(msg, cfg) {
-  if (!cfg || cfg.enabled !== true) return null;
   if (!msg || typeof msg !== "object") return null;
   const key = msg.key || {};
   if (key.fromMe) return null;
-  if (String(key.remoteJid || "") !== String(cfg.from || "")) return null;
-  if (!isGroupJid(cfg.from) || !isGroupJid(cfg.to) || cfg.from === cfg.to) return null;
+  const pairs = asPairs(cfg).map((p, i) => cleanPair(p, i)).filter((p) => p.enabled);
+  const pair = pairs.find((p) => String(key.remoteJid || "") === p.from);
+  if (!pair) return null;
   const m = msg.message || {};
   if (m.protocolMessage || m.reactionMessage || m.pollCreationMessage) return null;
-  if (typeof m.conversation === "string" && m.conversation.trim()) return {kind: "text", text: m.conversation};
+  const base = {to: pair.to, pairId: pair.id};
+  if (typeof m.conversation === "string" && m.conversation.trim()) return {kind: "text", text: m.conversation, ...base};
   const ext = m.extendedTextMessage;
-  if (ext && typeof ext.text === "string" && ext.text.trim()) return {kind: "text", text: ext.text};
+  if (ext && typeof ext.text === "string" && ext.text.trim()) return {kind: "text", text: ext.text, ...base};
   if (m.imageMessage && (typeof m.imageMessage.caption === "string" || true)) {
-    return {kind: "image", caption: typeof m.imageMessage.caption === "string" ? m.imageMessage.caption : "", msg};
+    return {kind: "image", caption: typeof m.imageMessage.caption === "string" ? m.imageMessage.caption : "", msg, ...base};
   }
   return null;
 }
+// Todos os pares que casam com a mensagem (independentes entre si).
+export function matchPairs(msg, cfg) {
+  if (!msg || typeof msg !== "object" || msg.key?.fromMe) return [];
+  const jid = String(msg.key?.remoteJid || "");
+  return asPairs(cfg).map((p, i) => cleanPair(p, i))
+    .filter((p) => p.enabled && jid === p.from);
+}
 async function handleIncoming(upsert) {
   await loadClone();
-  if (!clone.enabled || !sock || !connected) return;
+  if (!sock || !connected) return;
+  if (!clone.pairs.some((p) => p.enabled)) return;
   const list = upsert?.messages || [];
   for (const msg of list) {
     if (msg?.key?.fromMe) continue;
     // Ignora histórico antigo: só mensagens dos últimos 10 min.
     const ts = Number(msg?.messageTimestamp) || 0;
     if (ts && Date.now() / 1000 - ts > 600) continue;
-    const job = shouldClone(msg, clone);
+    const job = shouldClone(msg, {pairs: clone.pairs});
     if (!job) continue;
     try {
       if (job.kind === "image") {
         const buf = await sock.downloadMediaMessage(msg, "buffer", {});
         const caption = (await applyAffiliateToText(job.caption, clone.aff)).text;
-        await sock.sendMessage(clone.to, {image: buf, caption});
+        await sock.sendMessage(job.to, {image: buf, caption});
       } else {
         const text = (await applyAffiliateToText(job.text, clone.aff)).text;
-        await sock.sendMessage(clone.to, {text});
+        await sock.sendMessage(job.to, {text});
       }
-      clone.cloned++;
-      clone.lastAt = Date.now();
+      const pair = clone.pairs.find((p) => p.id === job.pairId);
+      if (pair) { pair.cloned++; pair.lastAt = Date.now(); }
       clone.lastError = "";
       saveClone();
     } catch {
@@ -318,7 +343,7 @@ async function applyAffiliateToText(text, aff) {
   } catch {}
   return {text: out, replaced};
 }
-export async function setClone({from, to, enabled, affiliate}) {
+export async function setClone({from, to, enabled, affiliate, pairs}) {
   await loadClone();
   if (affiliate !== undefined) {
     const a = affiliate || {};
@@ -338,22 +363,46 @@ export async function setClone({from, to, enabled, affiliate}) {
       throw Error("Para converter Shopee, salve seu App ID + Secret.");
     }
   }
-  const f = String(from || "").trim(), t = String(to || "").trim();
-  if (enabled === true) {
-    if (!isGroupJid(f) || !isGroupJid(t)) throw Error("Escolha grupos válidos.");
-    if (f === t) throw Error("Origem e destino precisam ser grupos diferentes.");
-    clone.from = f; clone.to = t; clone.enabled = true;
-  } else if (enabled === false) {
-    clone.enabled = false;
-    if (f) clone.from = f;
-    if (t) clone.to = t;
+  if (pairs !== undefined) {
+    // Substitui a lista de pares (cada par independente: origem/destino/ligado).
+    if (!Array.isArray(pairs) || !pairs.length || pairs.length > MAX_PAIRS) {
+      throw Error("Envie de 1 a " + MAX_PAIRS + " pares.");
+    }
+    const cleaned = pairs.map((p, i) => cleanPair(p, i));
+    for (const p of cleaned) {
+      if (p.enabled && (!p.from || !p.to)) throw Error("Par '" + p.id + "': escolha origem e destino.");
+      if (p.enabled && p.from === p.to) throw Error("Par '" + p.id + "': origem e destino precisam ser diferentes.");
+      const prev = clone.pairs.find((x) => x.id === p.id && x.from === p.from && x.to === p.to);
+      if (prev) { p.cloned = prev.cloned; p.lastAt = prev.lastAt; }
+    }
+    clone.pairs = cleaned;
+  } else {
+    // Compat: par único vira/atualiza o primeiro par, sem mexer nos demais.
+    const f = String(from || "").trim(), t = String(to || "").trim();
+    let p1 = clone.pairs.find((p) => p.id === "p1");
+    if (!p1) { p1 = {id: "p1", from: "", to: "", enabled: false, cloned: 0, lastAt: 0}; clone.pairs.unshift(p1); }
+    if (enabled === true) {
+      if (!isGroupJid(f) || !isGroupJid(t)) throw Error("Escolha grupos válidos.");
+      if (f === t) throw Error("Origem e destino precisam ser grupos diferentes.");
+      if (p1.from !== f || p1.to !== t) { p1.cloned = 0; p1.lastAt = 0; }
+      p1.from = f; p1.to = t; p1.enabled = true;
+    } else if (enabled === false) {
+      p1.enabled = false;
+      if (f) p1.from = f;
+      if (t) p1.to = t;
+    }
+    clone.pairs = clone.pairs.slice(0, MAX_PAIRS);
   }
   saveClone();
   return cloneStatus();
 }
 export function cloneStatus() {
-  return {enabled: clone.enabled, from: clone.from, to: clone.to,
-    cloned: clone.cloned, lastAt: clone.lastAt || null, lastError: clone.lastError || null,
+  return {enabled: clone.pairs.some((p) => p.enabled),
+    from: clone.pairs[0]?.from || "", to: clone.pairs[0]?.to || "",
+    cloned: clone.pairs.reduce((n, p) => n + (p.cloned || 0), 0),
+    lastAt: clone.pairs.reduce((m, p) => Math.max(m, p.lastAt || 0), 0) || null,
+    lastError: clone.lastError || null,
+    pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt || null})),
     affiliate: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord,
       shopeeConvert: clone.aff.shopeeConvert, hasShopee: Boolean(clone.aff.shopeeId && clone.aff.shopeeSecret)}};
 }

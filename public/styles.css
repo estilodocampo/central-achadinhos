@@ -32,3 +32,9 @@
 .conn-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.8px;padding:3px 10px;border-radius:999px;vertical-align:middle;margin-left:8px}
 .conn-badge.ok{background:#e6f7ee;color:#0d7a3f;border:1px solid #0d7a3f33}
 .conn-badge.off{background:#eef1f4;color:#84909d;border:1px solid #c6d2dd}
+
+
+.clone-pair{margin:0 0 14px;padding:16px}
+.clone-pair h3 small{font-weight:400;font-size:11px;color:#84909d}
+.switch{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#172337;cursor:pointer;white-space:nowrap}
+.switch input{width:20px;height:20px;accent-color:#18936d;cursor:pointer}
