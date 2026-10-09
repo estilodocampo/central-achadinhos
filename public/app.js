@@ -363,8 +363,20 @@
     return null;
   }
   function applyMLAffiliateLocal(rawUrl) {
-    const cfg = mlAff();
-    if (!cfg) return '';
+    return applyMLAffiliateWith(mlAff() || serverAffSync(), rawUrl);
+  }
+  let serverAffCache = undefined, serverAffAt = 0;
+  function serverAffSync() {
+    if (serverAffCache && Date.now() - serverAffAt < 300000) return serverAffCache;
+    fetch('/api/wa/clone', {cache: 'no-store'}).then(r => r.json()).then(c => {
+      serverAffCache = (c.affiliate?.mlTool && c.affiliate?.mlWord)
+        ? {tool: c.affiliate.mlTool, word: c.affiliate.mlWord} : null;
+      serverAffAt = Date.now();
+    }).catch(() => { serverAffCache = null; serverAffAt = Date.now(); });
+    return serverAffCache || null;
+  }
+  function applyMLAffiliateWith(cfg, rawUrl) {
+    if (!cfg || !cfg.tool || !cfg.word) return '';
     try {
       const u = new URL(rawUrl);
       if (u.protocol !== 'https:') return '';
@@ -570,6 +582,7 @@
   const hadDraft = restoreDraft();
   if (!hadDraft || !el('message').value) buildMessage(); else { saveDraft(); updateBubble(); }
   updatePhotoPreview();
+  serverAffSync();
   showStep(0);
   mlConnectionStatus();
   waRefresh();
