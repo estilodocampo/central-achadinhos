@@ -20,7 +20,8 @@
           price: el('f-price').value, old: el('f-old').value, coupon: el('f-coupon').value,
           link: el('f-link').value, image: el('f-image').value, message: el('message').value,
           autoSend: el('auto-send')?.checked === true,
-          groups: [...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group)
+          groups: [...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group),
+          groupsTouched
         }));
       } catch {}
     }, 250);
@@ -237,7 +238,8 @@
   }
   let lastGroupsSig = '';
   let groupsFirstLoad = true;
-  const draftGroups = (() => { try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); return Array.isArray(d?.groups) ? d.groups : null; } catch { return null; } })();
+  let groupsTouched = false;
+  try { groupsTouched = JSON.parse(localStorage.getItem(DRAFT) || 'null')?.groupsTouched === true; } catch {}
   async function loadGroups(force = true) {
     const box = el('groups-list');
     try {
@@ -247,14 +249,22 @@
       const sig = groups.map(g => g.id).join('|');
       if (!force && sig === lastGroupsSig) return;
       const keep = new Set([...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group));
+      if (groupsFirstLoad && groupsTouched) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(DRAFT) || 'null')?.groups;
+          if (Array.isArray(saved)) saved.forEach(id => keep.add(id));
+        } catch {}
+      }
       lastGroupsSig = sig;
       box.innerHTML = groups.length ? groups.map(g => {
-        const checked = groupsFirstLoad ? (draftGroups ? draftGroups.includes(g.id) : true) : keep.has(g.id);
+        const checked = groupsFirstLoad ? (groupsTouched ? keep.has(g.id) : true) : keep.has(g.id);
         return '<label class="publish-item"><input type="checkbox" data-group="' + html(g.id) + '"' + (checked ? ' checked' : '') + '> <div style="min-width:0"><h4>' +
         html(g.name) + '</h4><p>' + g.size + ' participantes</p></div></label>';}).join('')
         : '<div class="empty"><strong>Nenhum grupo encontrado</strong><p>Conecte o WhatsApp e atualize.</p></div>';
       groupsFirstLoad = false;
-    } catch { box.innerHTML = '<div class="empty"><strong>Falha ao listar grupos</strong></div>'; }
+    } catch {
+      if (!box.querySelector('[data-group]')) box.innerHTML = '<div class="empty"><strong>Falha ao listar grupos</strong></div>';
+    }
   }
   function selectedGroups() {
     return [...document.querySelectorAll('[data-group]:checked')].map(i => i.dataset.group);
@@ -266,7 +276,11 @@
     const msg = el('message').value.trim();
     const groups = selectedGroups();
     if (!msg) return toast('Gere a mensagem primeiro.', true);
-    if (!groups.length) return toast('Selecione ao menos 1 grupo.', true);
+    if (!groups.length) {
+      showStep(3);
+      toast('Marque ao menos 1 grupo abaixo e tente de novo.', true);
+      return;
+    }
     const btn = el('send-btn');
     btn.disabled = true; btn.textContent = 'Replicando…';
     try {
@@ -275,7 +289,11 @@
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha no envio.');
       toast('Replicado em ' + d.sent + '/' + d.total + ' grupos.');
-    } catch (e) { toast(e.message || 'Falha no envio.', true); }
+    } catch (e) {
+      const m = e.message || 'Falha no envio.';
+      toast(m, true);
+      if (/desconectado|QR/i.test(m)) showStep(3);
+    }
     finally { btn.disabled = false; btn.textContent = 'Replicar agora ↗'; }
   }
   el('today-label').textContent = new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'});
@@ -293,7 +311,7 @@
   el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); scheduleAutoImport(); });
   el('message').addEventListener('input', () => { updateBubble(); saveDraft(); });
   el('f-image').addEventListener('input', () => { updatePhotoPreview(); saveDraft(); });
-  document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) saveDraft(); });
+  document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) { groupsTouched = true; saveDraft(); } });
   el('auto-send')?.addEventListener('change', saveDraft);
   el('fetch-btn').addEventListener('click', fetchPreview);
   el('ad-url').addEventListener('input', syncPlatformFromLink);
