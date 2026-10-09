@@ -238,12 +238,14 @@
           const detail=(error.message.match(/codigo=([a-z_]{3,40})/)||[])[1]||'';
           const http=(error.message.match(/HTTP (\d{3})/)||[])[1]||'';
           // Só códigos e metadados públicos: nunca segredos, tokens ou o código em si.
-          let app='env', codeLen=0;
+          let app='env', codeLen=0, codeSpc=0;
           try{
             app=peekPendingClient(req.headers.cookie,process.env)?.id||'env';
-            codeLen=String(new URL(req.url,`http://${req.headers.host||'localhost'}`).searchParams.get('code')||'').length;
+            const rawCode=String(new URL(req.url,`http://${req.headers.host||'localhost'}`).searchParams.get('code')||'');
+            codeLen=rawCode.length;
+            codeSpc=rawCode.includes(' ') ? 1 : 0;
           }catch{}
-          if(reason!=='unknown')console.warn('[ML_OAUTH] etapa='+reason+(http?', http='+http:'')+(detail?', codigo='+detail:', sem codigo do ML')+', app='+app+', codeLen='+codeLen);
+          if(reason!=='unknown')console.warn('[ML_OAUTH] etapa='+reason+(http?', http='+http:'')+(detail?', codigo='+detail:', sem codigo do ML')+', app='+app+', codeLen='+codeLen+', spc='+codeSpc);
           res.writeHead(303,{'location':'/?ml=error&reason='+reason+(detail?'&detail='+detail:''),
             'cache-control':'no-store','referrer-policy':'no-referrer'});
           return res.end();

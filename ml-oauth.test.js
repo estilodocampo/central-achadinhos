@@ -141,3 +141,28 @@ test('erro 400 sem corpo JSON gera mensagem sem codigo',async()=>{
     cookieValue(begin.cookie),env,async()=>({ok:false,status:400,json:async()=>{throw Error('vazio');}})),
     /categoria=bad_request/);
 });
+
+
+test('codigo com espaco tenta variante com + antes de falhar',async()=>{
+  const begin=createAuthorization(env);
+  const state=new URL(begin.url).searchParams.get('state');
+  let calls=0;
+  await assert.rejects(()=>completeAuthorization({state,code:'ML CODE COM ESPACO 123456789'},
+    cookieValue(begin.cookie),env,async(_url,options)=>{
+      calls++;
+      const code=new URLSearchParams(options.body).get('code');
+      if(calls===1)assert.equal(code,'ML CODE COM ESPACO 123456789');
+      else assert.equal(code,'ML+CODE+COM+ESPACO+123456789');
+      return {ok:false,status:400,json:async()=>({})};
+    }),/recusou a autoriza/);
+  assert.equal(calls,2);
+});
+test('codigo sem espaco falha direto sem segunda tentativa',async()=>{
+  const begin=createAuthorization(env);
+  const state=new URL(begin.url).searchParams.get('state');
+  let calls=0;
+  await assert.rejects(()=>completeAuthorization({state,code:'ML-CODE-123456789'},
+    cookieValue(begin.cookie),env,async()=>{calls++;return {ok:false,status:400,json:async()=>({})};}),
+    /recusou a autoriza/);
+  assert.equal(calls,1);
+});

@@ -170,9 +170,20 @@ export async function completeAuthorization(query,cookieHeader,env=process.env,r
   const form={grant_type:'authorization_code',client_id:client?client.id:env.ML_CLIENT_ID,
     client_secret:client?client.secret:env.ML_CLIENT_SECRET,code:query.code,redirect_uri:pending.redirectUri||env.ML_REDIRECT_URI||ML_REDIRECT_URI};
   if(pending.verifier)form.code_verifier=pending.verifier;
-  const session=await callToken(form,request,client);
-  return {cookie:cookie(SESSION_COOKIE,seal(session,env),SIX_MONTHS),
-    clearState:clearStateCookie()};
+  try{
+    const session=await callToken(form,request,client);
+    return {cookie:cookie(SESSION_COOKIE,seal(session,env),SIX_MONTHS),
+      clearState:clearStateCookie()};
+  }catch(first){
+    // Códigos com '+' podem chegar com espaço após o parse da query.
+    // Tentativas falhas não consomem o código: tenta a variante restaurada.
+    const msg=String(first?.message||'');
+    if(msg.includes('codigo=')||!query.code.includes(' '))throw first;
+    const retry={...form,code:query.code.replace(/ /g,'+')};
+    const session=await callToken(retry,request,client);
+    return {cookie:cookie(SESSION_COOKIE,seal(session,env),SIX_MONTHS),
+      clearState:clearStateCookie()};
+  }
 }
 export async function getAuthorizedToken(cookieHeader,env=process.env,request=fetch){
   const current=readSession(cookieHeader,env);
