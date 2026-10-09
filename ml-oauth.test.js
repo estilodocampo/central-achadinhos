@@ -166,3 +166,16 @@ test('codigo sem espaco falha direto sem segunda tentativa',async()=>{
     /recusou a autoriza/);
   assert.equal(calls,1);
 });
+
+
+test('forcePkce adiciona challenge mesmo sem env',()=>{
+  const begin=createAuthorization({CENTRAL_ADMIN_PASSWORD:'x'},'',{id:'999888',secret:'segredo-do-cliente-123456'},true);
+  const u=new URL(begin.url);
+  assert.equal(u.searchParams.get('code_challenge_method'),'S256');
+  assert.ok(u.searchParams.get('code_challenge'));
+});
+test('sem forcePkce e sem env nao adiciona challenge',()=>{
+  const begin=createAuthorization({CENTRAL_ADMIN_PASSWORD:'x'},'',{id:'999888',secret:'segredo-do-cliente-123456'});
+  const u=new URL(begin.url);
+  assert.equal(u.searchParams.get('code_challenge_method'),null);
+});

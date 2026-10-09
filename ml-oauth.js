@@ -89,7 +89,7 @@ function safeEqual(a,b){
   const left=Buffer.from(a),right=Buffer.from(b);
   return left.length===right.length && timingSafeEqual(left,right);
 }
-export function createAuthorization(env=process.env, redirectUriOverride='', oauthCreds=null){
+export function createAuthorization(env=process.env, redirectUriOverride='', oauthCreds=null, forcePkce=false){
   let client = null;
   if (oauthCreds) client = validClientCreds(oauthCreds.id ?? oauthCreds.clientId, oauthCreds.secret ?? oauthCreds.clientSecret);
   else if(!hasOAuthConfig(env))throw Error('ML_CLIENT_ID, ML_CLIENT_SECRET e senha administrativa são obrigatórios');
@@ -101,7 +101,7 @@ export function createAuthorization(env=process.env, redirectUriOverride='', oau
   url.searchParams.set('client_id',client ? client.id : env.ML_CLIENT_ID);
   url.searchParams.set('redirect_uri',redirectUri);
   url.searchParams.set('state',state);
-  if(env.ML_OAUTH_PKCE==='true'){
+  if(env.ML_OAUTH_PKCE==='true'||forcePkce){
     const verifier=randomBytes(48).toString('base64url');
     pending.verifier=verifier;
     url.searchParams.set('code_challenge',createHash('sha256').update(verifier).digest('base64url'));

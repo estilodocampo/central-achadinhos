@@ -209,7 +209,7 @@
           try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
           try{
             const client=validClientCreds(body.clientId,body.clientSecret);
-            const start=createAuthorization(process.env,resolveRedirectUri(req),client);
+            const start=createAuthorization(process.env,resolveRedirectUri(req),client,true);
             return send(res,200,{url:start.url},'application/json; charset=utf-8',false,{'set-cookie':start.cookie});
           }catch(e){return send(res,400,{error:e?.message||'Credenciais inválidas.'});}
         }
