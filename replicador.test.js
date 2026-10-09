@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isGroupJid, normalizeGroupIds, validateSend, classifyClose, backoffFor} from './wa-gateway.js';
+import {isGroupJid, normalizeGroupIds, validateSend, classifyClose, backoffFor, shouldClone} from './wa-gateway.js';
 
 test('jid de grupo válido e inválido', () => {
   assert.equal(isGroupJid('120363123456@g.us'), true);
@@ -40,4 +40,22 @@ test('validateSend recusa mensagem vazia, longa ou sem grupo', () => {
   assert.equal(ok.ok, true);
   assert.equal(ok.message, 'Oferta!');
   assert.deepEqual(ok.groups, ['120363000001@g.us']);
+});
+
+
+test('shouldClone aceita texto e foto do grupo origem',()=>{
+  const cfg={enabled:true,from:'120363000001@g.us',to:'120363000002@g.us'};
+  assert.deepEqual(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:' Promo '}},cfg),{kind:'text',text:' Promo '});
+  const img=shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{imageMessage:{caption:'Oferta'}}},cfg);
+  assert.equal(img.kind,'image');
+  assert.equal(img.caption,'Oferta');
+});
+test('shouldClone barra loop, outro grupo e tipos do sistema',()=>{
+  const cfg={enabled:true,from:'120363000001@g.us',to:'120363000002@g.us'};
+  assert.equal(shouldClone({key:{fromMe:true,remoteJid:'120363000001@g.us'},message:{conversation:'x'}},cfg),null);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000009@g.us'},message:{conversation:'x'}},cfg),null);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{protocolMessage:{}}},cfg),null);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{stickerMessage:{}}},cfg),null);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:'x'}},{...cfg,enabled:false}),null);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:'x'}},{enabled:true,from:'120363000001@g.us',to:'120363000001@g.us'}),null);
 });

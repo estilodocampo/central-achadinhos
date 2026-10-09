@@ -110,3 +110,29 @@ export async function clearAuthState() {
   }
   try { rmSync(SESSION_DIR, {recursive: true, force: true}); } catch {}
 }
+
+// Config pequena do clonador (origem/destino/ligado). Não guarda mensagens.
+const memCfg = new Map();
+export async function getCfg(key) {
+  if (usePg()) {
+    try {
+      const p = await pool();
+      await p.query("CREATE TABLE IF NOT EXISTS wa_cfg (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+      const r = await p.query("SELECT value FROM wa_cfg WHERE key=$1", [String(key)]);
+      if (!r.rows[0]) return null;
+      return JSON.parse(r.rows[0].value);
+    } catch { return memCfg.get(String(key)) ?? null; }
+  }
+  return memCfg.get(String(key)) ?? null;
+}
+export async function setCfg(key, value) {
+  memCfg.set(String(key), value);
+  if (usePg()) {
+    try {
+      const p = await pool();
+      await p.query("CREATE TABLE IF NOT EXISTS wa_cfg (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+      await p.query("INSERT INTO wa_cfg (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+        [String(key), JSON.stringify(value ?? null)]);
+    } catch {}
+  }
+}

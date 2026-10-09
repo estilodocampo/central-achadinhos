@@ -5,13 +5,13 @@
   const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri,validClientCreds } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem,matchingTitle} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct,userShopeeCreds} = await import('./shopee-affiliate.js');
-  const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode } = await import('./wa-gateway.js');
+  const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode,setClone,cloneStatus } = await import('./wa-gateway.js');
   const { readFile, stat } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
-  const VERSION='1.6.0';
+  const VERSION='1.7.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
   function marketUrl(input) {
     const u=new URL(input);
@@ -312,6 +312,14 @@
         try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
         try{return send(res,200,{code:await waPairCode(body.phone)});}
         catch(e){return send(res,400,{error:e?.message||'Falha ao gerar código.'});}
+      }
+      if(path==='/api/wa/clone'){
+        if(req.method==='GET')return send(res,200,cloneStatus());
+        if(req.method!=='POST')return send(res,405,{error:'Método inválido.'});
+        let body;
+        try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+        try{return send(res,200,await setClone(body||{}));}
+        catch(e){return send(res,400,{error:e?.message||'Falha ao configurar.'});}
       }
       if(req.method!=='GET'&&req.method!=='HEAD')return send(res,405,{error:'Método inválido.'});
       const loc=path==='/'?'/index.html':path;

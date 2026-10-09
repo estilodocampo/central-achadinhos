@@ -18,8 +18,9 @@
       <button class="nav-btn" data-step="1"><span class="nav-emoji">🔗</span> 1. Anúncio</button>
       <button class="nav-btn" data-step="2"><span class="nav-emoji">💬</span> 2. Mensagem</button>
       <button class="nav-btn" data-step="3"><span class="nav-emoji">↗</span> 3. Grupos</button>
+      <button class="nav-btn" data-step="4"><span class="nav-emoji">🔁</span> 4. Clonador</button>
     </nav>
-    <div class="sidebar-bottom"><span class="online-dot"></span> Replicador <span class="ver">v1.6.0</span><p>Nada é salvo. Conecte o WhatsApp, monte a mensagem e replique.</p></div>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Replicador <span class="ver">v1.7.0</span><p>Nada é salvo. Conecte o WhatsApp, monte a mensagem e replique.</p></div>
   </aside>
 
   <main class="main-content">
@@ -103,7 +104,15 @@
         <p class="tiny-warning">Envio automático pela sua conta. Comece com poucos grupos para evitar bloqueio. Nenhum dado é salvo no servidor.</p>
       </div>
     </section>
-    <footer class="footer">Replicador <b>v1.6</b> <span>•</span> Nada é salvo. Painel independente.</footer>
+    <section class="panel form-panel hidden" id="step-clone">
+      <div class="panel-head"><div><h3>🔁 4. Clonador de grupos</h3><p>Ofertas de um grupo caem no seu, sozinhas. Só texto e foto.</p></div></div>
+      <p id="clone-status" class="assist-message" role="status">Carregando…</p>
+      <div class="form-row"><label class="field"><span>Clonar DE (origem)</span><select id="clone-from"><option value="">Escolha o grupo…</option></select></label><label class="field"><span>Para O MEU (destino)</span><select id="clone-to"><option value="">Escolha o grupo…</option></select></label></div>
+      <label class="publish-item"><input type="checkbox" id="clone-on"> <div><h4>Clonagem ligada</h4><p>Replica novas mensagens na hora</p></div></label>
+      <div class="composer-actions"><button type="button" id="clone-save" class="btn btn-primary">Salvar clonador</button></div>
+      <p class="tiny-warning">Anti-loop: ignora as próprias mensagens e só vale para grupos diferentes. A config sobrevive a reinícios; mensagens nunca são salvas.</p>
+    </section>
+    <footer class="footer">Replicador <b>v1.7</b> <span>•</span> Nada é salvo. Painel independente.</footer>
   </main>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

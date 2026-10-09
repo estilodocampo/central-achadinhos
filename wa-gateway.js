@@ -4,7 +4,7 @@
 import {DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, makeWASocket} from "@whiskeysockets/baileys";
 import pino from "pino";
 import QRCode from "qrcode";
-import {loadAuthState, clearAuthState, storeMode} from "./wa-store.js";
+import {loadAuthState, clearAuthState, storeMode, getCfg, setCfg} from "./wa-store.js";
 
 const MAX_GROUPS_PER_SEND = 20;
 const MAX_MESSAGE = 2000;
@@ -128,6 +128,7 @@ async function boot() {
     });
     sock = s;
     s.ev.on("creds.update", saveCreds);
+    s.ev.on("messages.upsert", (m) => { handleIncoming(m).catch(() => {}); });
     s.ev.on("connection.update", async (u) => {
       if (u.qr) {
         try { lastQr = await QRCode.toDataURL(u.qr, {width: 240, margin: 1}); lastQrAt = Date.now(); }
@@ -175,6 +176,93 @@ export function startWhatsApp() {
   return boot().catch(() => sock);
 }
 
+// ---------- Clonador de grupos ----------
+const clone = {enabled: false, from: "", to: "", cloned: 0, lastAt: 0, lastError: ""};
+let cloneLoaded = false;
+async function loadClone() {
+  if (cloneLoaded) return;
+  cloneLoaded = true;
+  try {
+    const c = await getCfg("clone");
+    if (c && typeof c === "object") {
+      clone.enabled = c.enabled === true;
+      clone.from = isGroupJid(c.from) ? c.from : "";
+      clone.to = isGroupJid(c.to) ? c.to : "";
+      clone.cloned = Number(c.cloned) || 0;
+      clone.lastAt = Number(c.lastAt) || 0;
+      if (!clone.from || !clone.to || clone.from === clone.to) clone.enabled = false;
+    }
+  } catch {}
+}
+function saveClone() {
+  setCfg("clone", {enabled: clone.enabled, from: clone.from, to: clone.to, cloned: clone.cloned, lastAt: clone.lastAt}).catch(() => {});
+}
+// Decisão pura/testável: só texto e foto, nunca as próprias mensagens (anti-loop).
+export function shouldClone(msg, cfg) {
+  if (!cfg || cfg.enabled !== true) return null;
+  if (!msg || typeof msg !== "object") return null;
+  const key = msg.key || {};
+  if (key.fromMe) return null;
+  if (String(key.remoteJid || "") !== String(cfg.from || "")) return null;
+  if (!isGroupJid(cfg.from) || !isGroupJid(cfg.to) || cfg.from === cfg.to) return null;
+  const m = msg.message || {};
+  if (m.protocolMessage || m.reactionMessage || m.pollCreationMessage) return null;
+  if (typeof m.conversation === "string" && m.conversation.trim()) return {kind: "text", text: m.conversation};
+  const ext = m.extendedTextMessage;
+  if (ext && typeof ext.text === "string" && ext.text.trim()) return {kind: "text", text: ext.text};
+  if (m.imageMessage && (typeof m.imageMessage.caption === "string" || true)) {
+    return {kind: "image", caption: typeof m.imageMessage.caption === "string" ? m.imageMessage.caption : "", msg};
+  }
+  return null;
+}
+async function handleIncoming(upsert) {
+  await loadClone();
+  if (!clone.enabled || !sock || !connected) return;
+  const list = upsert?.messages || [];
+  for (const msg of list) {
+    if (msg?.key?.fromMe) continue;
+    // Ignora histórico antigo: só mensagens dos últimos 10 min.
+    const ts = Number(msg?.messageTimestamp) || 0;
+    if (ts && Date.now() / 1000 - ts > 600) continue;
+    const job = shouldClone(msg, clone);
+    if (!job) continue;
+    try {
+      if (job.kind === "image") {
+        const buf = await sock.downloadMediaMessage(msg, "buffer", {});
+        await sock.sendMessage(clone.to, {image: buf, caption: job.caption});
+      } else {
+        await sock.sendMessage(clone.to, {text: job.text});
+      }
+      clone.cloned++;
+      clone.lastAt = Date.now();
+      clone.lastError = "";
+      saveClone();
+    } catch {
+      clone.lastError = "Falha ao replicar mensagem.";
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+export async function setClone({from, to, enabled}) {
+  await loadClone();
+  const f = String(from || "").trim(), t = String(to || "").trim();
+  if (enabled) {
+    if (!isGroupJid(f) || !isGroupJid(t)) throw Error("Escolha grupos válidos.");
+    if (f === t) throw Error("Origem e destino precisam ser grupos diferentes.");
+    clone.from = f; clone.to = t; clone.enabled = true;
+  } else {
+    clone.enabled = false;
+    if (f) clone.from = f;
+    if (t) clone.to = t;
+  }
+  saveClone();
+  return cloneStatus();
+}
+export function cloneStatus() {
+  return {enabled: clone.enabled, from: clone.from, to: clone.to,
+    cloned: clone.cloned, lastAt: clone.lastAt || null, lastError: clone.lastError || null};
+}
+
 export async function waStatus() {
   const qrFresh = Boolean(!connected && !needsRepair && lastQr && Date.now() - lastQrAt < 60000);
   return {connected, user: phoneUser, qr: qrFresh ? lastQr : null, qrFresh,
@@ -182,6 +270,7 @@ export async function waStatus() {
     pairCode, pairAge: pairCode ? Math.round((Date.now() - pairCodeAt) / 1000) : null,
     groups: groupsCache.length, groupsAt,
     uptimeSec: Math.round((Date.now() - bootAt) / 1000),
+    clone: cloneStatus(),
     session: storeMode(), maxPerSend: MAX_GROUPS_PER_SEND};
 }
 

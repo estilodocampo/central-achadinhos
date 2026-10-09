@@ -1,4 +1,4 @@
-# Central de Achadinhos — Replicador v1.6.0 (modo comercial)
+# Central de Achadinhos — Replicador v1.7.0 (modo comercial)
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — cada cliente conecta as próprias contas no painel.
 
@@ -17,6 +17,10 @@ Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus gr
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — só o login do WhatsApp é guardado (como "manter conectado"), igual à loja.
 
+## Clonador de grupos (etapa 4)
+
+Espelha ofertas de um grupo (origem) no seu grupo (destino), sozinhas, na hora que chegam. Só texto e foto; ignora figurinhas, enquetes, reações e as próprias mensagens (anti-loop total). A config (origem/destino/ligado/contador) sobrevive a reinícios — mensagens nunca são salvas.
+
 ## Sessão que sobrevive (padrão da loja Estilo do Campo)
 
 - `wa-store.js`: credenciais Baileys em Postgres (`DATABASE_URL`, tabela `wa_auth`) no Render; arquivos locais (`data/wpp-session`) no PC
@@ -24,9 +28,7 @@ Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus gr
 - Painel: estado de reparo + **vincular por código de 8 letras** (plano B quando o QR não completa) + botão **🔄 Novo QR**
 - Reiniciou ou fez deploy? Reconecta sozinho sem novo QR. Só peça novo QR se mostrar "reparar sessão".
 
-Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Nada é salvo** — sem banco, sem login, sem histórico.
-
-## Como usar (3 passos)
+## Como usar (passo a passo)
 
 1. **Anúncio**: cole o link → Buscar dados (título, preço, foto via `/api/preview`) → revise.
 2. **Mensagem**: gerada automaticamente, editável, com preço, cupom e seu link de afiliado.

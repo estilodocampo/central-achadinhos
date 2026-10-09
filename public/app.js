@@ -266,13 +266,14 @@
     finally { btn.disabled = false; btn.textContent = 'Replicar agora ↗'; }
   }
   el('today-label').textContent = new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'});
-  const STEP_VIEWS = ['step-conexoes', 'step-anuncio', 'step-mensagem', 'step-grupos'];
+  const STEP_VIEWS = ['step-conexoes', 'step-anuncio', 'step-mensagem', 'step-grupos', 'step-clone'];
   function showStep(n) {
     const id = STEP_VIEWS[Number(n)];
     if (!id || !el(id)) return;
     STEP_VIEWS.forEach(s => el(s)?.classList.toggle('hidden', s !== id));
     document.querySelectorAll('.side-nav [data-step]').forEach(x => x.classList.toggle('active', x.dataset.step === String(n)));
     window.scrollTo({top: 0, behavior: 'smooth'});
+    if (String(n) === '4' && typeof refreshClone === 'function') refreshClone();
   }
   document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => showStep(b.dataset.step)));
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
@@ -301,6 +302,42 @@
   el('select-all').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = true));
   el('select-none').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = false));
   el('send-btn').addEventListener('click', sendNow);
+  function fillCloneSelects(groups) {
+    for (const id of ['clone-from', 'clone-to']) {
+      const sel = el(id);
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">Escolha o grupo…</option>' + groups.map(g =>
+        '<option value="' + html(g.id) + '">' + html(g.name) + ' (' + g.size + ')</option>').join('');
+      if (keep) sel.value = keep;
+    }
+  }
+  async function refreshClone() {
+    const st = el('clone-status');
+    try {
+      const [g, c] = await Promise.all([
+        fetch('/api/wa/groups', {cache: 'no-store'}).then(r => r.json()).catch(() => ({groups: []})),
+        fetch('/api/wa/clone', {cache: 'no-store'}).then(r => r.json()).catch(() => ({}))
+      ]);
+      fillCloneSelects(g.groups || []);
+      if (c.from) el('clone-from').value = c.from;
+      if (c.to) el('clone-to').value = c.to;
+      el('clone-on').checked = c.enabled === true;
+      st.className = 'assist-message ' + (c.enabled ? 'success' : '');
+      st.textContent = c.enabled
+        ? ('Ligado: clonando para ' + (((g.groups || []).find(x => x.id === c.to) || {}).name || c.to) + ' • ' + (c.cloned || 0) + ' replicadas.')
+        : 'Desligado. Escolha origem e destino, ligue e salve.';
+    } catch { st.textContent = 'Não foi possível carregar.'; }
+  }
+  el('clone-save').addEventListener('click', async () => {
+    try {
+      const r = await fetch('/api/wa/clone', {method: 'POST', headers: {'content-type': 'application/json'},
+        body: JSON.stringify({from: el('clone-from').value, to: el('clone-to').value, enabled: el('clone-on').checked})});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha.');
+      toast(d.enabled ? 'Clonador ligado!' : 'Clonador salvo (desligado).');
+      refreshClone();
+    } catch (e) { toast(e.message || 'Falha ao salvar.', true); }
+  });
   el('wa-logout').addEventListener('click', async () => {
     await fetch('/api/wa/logout', {method: 'POST'}).catch(() => {});
     toast('WhatsApp desconectado.');
