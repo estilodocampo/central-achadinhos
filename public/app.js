@@ -261,7 +261,48 @@
     toast('Sessão limpa. Aguarde o QR novo.');
     setTimeout(waRefresh, 2500);
   });
-  el('ml-connect').addEventListener('click', () => window.location.assign('/api/ml/start'));
+  el('ml-connect').addEventListener('click', async () => {
+    const mine = mlCreds();
+    if (!mine) { window.location.assign('/api/ml/start'); return; }
+    const btn = el('ml-connect');
+    btn.disabled = true; btn.textContent = 'Conectando…';
+    try {
+      const r = await fetch('/api/ml/start', {method: 'POST', headers: {'content-type': 'application/json'},
+        body: JSON.stringify({clientId: mine.id, clientSecret: mine.secret})});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha.');
+      window.location.assign(d.url);
+    } catch (e) { toast(e.message || 'Falha ao iniciar.', true); btn.disabled = false; btn.textContent = 'Conectar'; }
+  });
+  const ML_CREDS = 'ml-creds-v1';
+  function mlCreds() {
+    try {
+      const c = JSON.parse(localStorage.getItem(ML_CREDS) || 'null');
+      if (c && /^\d{4,20}$/.test(String(c.id || '')) && String(c.secret || '').length >= 8) return {id: String(c.id), secret: String(c.secret)};
+    } catch {}
+    return null;
+  }
+  el('ml-save').addEventListener('click', () => {
+    const id = el('ml-client-id').value.trim(), secret = el('ml-client-secret').value.trim();
+    if (!/^\d{4,20}$/.test(id)) return toast('App ID inválido (só números).', true);
+    if (secret.length < 8 || secret.length > 256) return toast('Client Secret inválido.', true);
+    try { localStorage.setItem(ML_CREDS, JSON.stringify({id, secret})); } catch {}
+    el('ml-client-secret').value = '';
+    toast('Chaves ML salvas neste navegador. Clique Conectar.');
+    mlConnectionStatus();
+  });
+  el('ml-forget').addEventListener('click', () => {
+    try { localStorage.removeItem(ML_CREDS); } catch {}
+    el('ml-client-id').value = ''; el('ml-client-secret').value = '';
+    toast('Chaves ML apagadas.');
+    mlConnectionStatus();
+  });
+  (function fillMlFields() {
+    try {
+      const c = JSON.parse(localStorage.getItem(ML_CREDS) || 'null');
+      if (c?.id) el('ml-client-id').value = c.id;
+    } catch {}
+  })();
   el('ml-disconnect').addEventListener('click', async () => {
     try {
       const r = await fetch('/api/ml/disconnect', {method: 'POST', credentials: 'same-origin'});
@@ -321,17 +362,23 @@
   })();
   async function mlConnectionStatus() {
     const st = el('ml-status'), c = el('ml-connect'), d = el('ml-disconnect');
+    const mine = (typeof mlCreds === 'function') ? mlCreds() : null;
     try {
       const r = await fetch('/api/ml/status', {credentials: 'same-origin', cache: 'no-store'});
       if (!r.ok) throw new Error();
       const s = await r.json();
-      c.disabled = !s.configured || s.connected;
+      const cb = el('ml-callback-url');
+      if (cb && s.redirectUri) cb.textContent = s.redirectUri;
+      const canConnect = Boolean(s.connected) ? false : Boolean(mine || s.configured);
+      c.disabled = s.connected || !canConnect;
       d.disabled = !s.connected;
       st.textContent = s.connected
         ? 'Conectado. Preços oficiais ativos.'
-        : s.configured
-          ? 'App configurado. Clique em Conectar.'
-          : 'Falta configurar ML_CLIENT_ID/SECRET no Render.';
+        : mine
+          ? 'Suas chaves salvas. Clique em Conectar.'
+          : s.configured
+            ? 'App do servidor configurado. Clique em Conectar.'
+            : 'Cole seu App ID + Secret acima e clique Salvar.';
     } catch {
       st.textContent = 'Não foi possível verificar.';
       c.disabled = true; d.disabled = true;
@@ -352,12 +399,15 @@
   });
   if (new URLSearchParams(window.location.search).get('ml') === 'connected') toast('Mercado Livre conectado para buscar preços.');
   if (new URLSearchParams(window.location.search).get('ml') === 'error') {
-    const reason = new URLSearchParams(window.location.search).get('reason');
-    toast(reason === 'token'
-      ? 'O Mercado Livre recusou (HTTP 400). Confira ML_CLIENT_SECRET no Render, o redirect https://central-achadinhos.onrender.com/api/ml/callback no app ML e conclua em poucos minutos.'
-      : 'Falha ao conectar o Mercado Livre. Tente de novo.', true);
+    const qs = new URLSearchParams(window.location.search);
+    const reason = qs.get('reason'), detail = qs.get('detail') || '';
+    const msg = reason !== 'token' ? 'Falha ao conectar o Mercado Livre. Tente de novo.'
+      : detail === 'invalid_client' ? 'Client Secret incorreto: copie de novo o Secret do seu app no painel de desenvolvedores ML e salve aqui.'
+      : detail === 'invalid_grant' ? 'Código expirado ou já usado: clique em Conectar e autorize em seguida, sem demora.'
+      : 'O Mercado Livre recusou (HTTP 400). Confira o Secret, o redirect no seu app ML e conclua em poucos minutos.';
+    toast(msg, true);
     el('fetch-status').className = 'assist-message error';
-    el('fetch-status').textContent = 'Conexão ML falhou. Sem ela, o preço de links de vitrine/perfil precisa ser manual.';
+    el('fetch-status').textContent = 'Conexão ML falhou (' + (detail || reason) + '). Sem ela, o preço de links de vitrine/perfil precisa ser manual.';
   }
   const hadDraft = restoreDraft();
   if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();

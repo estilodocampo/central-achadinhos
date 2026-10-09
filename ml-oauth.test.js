@@ -92,3 +92,43 @@ test('sessão copiada e modificada não pode ser descriptografada',async()=>{
  const status=sessionStatus(tampered,env);
  assert.equal(status.connected,false);
 });
+
+
+test('chaves do painel criam autorização com o próprio App ID',()=>{
+  const custom={id:'999888',secret:'segredo-do-cliente-123456'};
+  const begin=createAuthorization({},'',custom);
+  const u=new URL(begin.url);
+  assert.equal(u.searchParams.get('client_id'),'999888');
+  assert.ok(!begin.url.includes('12345'));
+  assert.throws(()=>createAuthorization({},'',{id:'abc',secret:'segredo-do-cliente-123456'}),/App ID/);
+  assert.throws(()=>createAuthorization({},'',{id:'999888',secret:'curto'}),/Secret/);
+});
+test('callback com chaves do painel usa o secret do cliente e renova com ele',async()=>{
+  const custom={id:'999888',secret:'segredo-do-cliente-123456'};
+  const noEnv={CENTRAL_ADMIN_PASSWORD:'OutraSenhaLonga#123'};
+  const begin=createAuthorization(noEnv,'',custom);
+  const state=new URL(begin.url).searchParams.get('state');
+  let seenSecret='';
+  const done=await completeAuthorization({state,code:'ML-CODE-999999999'},
+    cookieValue(begin.cookie),noEnv,async(_url,options)=>{
+      seenSecret=new URLSearchParams(options.body).get('client_secret');
+      return {ok:true,json:async()=>({access_token:'APP_USR-CUSTOM_111111',refresh_token:'TG-CUSTOM_222222',expires_in:45})};
+    });
+  assert.equal(seenSecret,'segredo-do-cliente-123456');
+  assert.equal(sessionStatus(cookieValue(done.cookie),noEnv).connected,true);
+  let refreshSecret='';
+  const res=await getAuthorizedToken(cookieValue(done.cookie),noEnv,async(_url,options)=>{
+    refreshSecret=new URLSearchParams(options.body).get('client_secret');
+    return {ok:true,json:async()=>({access_token:'APP_USR-CUSTOM_NEW',refresh_token:'TG-CUSTOM_NEW',expires_in:21600})};
+  });
+  assert.equal(res.status,'refreshed');
+  assert.equal(refreshSecret,'segredo-do-cliente-123456');
+  assert.ok(!cookieValue(res.cookie).includes('segredo-do-cliente-123456'));
+});
+test('erro do token expõe só o código OAuth sanitizado',async()=>{
+  const begin=createAuthorization(env);
+  const state=new URL(begin.url).searchParams.get('state');
+  await assert.rejects(()=>completeAuthorization({state,code:'ML-CODE-123456789'},
+    cookieValue(begin.cookie),env,async()=>({ok:false,status:400,json:async()=>({error:'invalid_client',error_description:'boom APP_USR-SECRET xyz'})})),
+    /codigo=invalid_client/);
+});

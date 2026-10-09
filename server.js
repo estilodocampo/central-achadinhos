@@ -2,7 +2,7 @@
   const { createServer } = await import('node:http');
   const { extractProduct } = await import('./product-parser.js');
   const { officialMLPrice, publicMLPrice, matchPublicPriceByTitle } = await import('./mercadolivre-price.js');
-  const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri } = await import('./ml-oauth.js');
+  const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri,validClientCreds } = await import('./ml-oauth.js');
   const {mercadoIdsFromPage,resolveCatalog,verifyItem,matchingTitle} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct,userShopeeCreds} = await import('./shopee-affiliate.js');
   const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode } = await import('./wa-gateway.js');
@@ -11,7 +11,7 @@
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
-  const VERSION='1.5.0';
+  const VERSION='1.6.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
   function marketUrl(input) {
     const u=new URL(input);
@@ -202,6 +202,17 @@
         return send(res,200,{...sessionStatus(req.headers.cookie),redirectUri:resolveRedirectUri(req)});
       }
       if(path==='/api/ml/start'){
+        if(req.method==='POST'){
+          // Chaves do PRÓPRIO cliente (painel comercial): vão seladas no cookie
+          // de estado, nunca na URL nem nos logs. Devolve JSON, sem redirect.
+          let body;
+          try{body=await readJson(req);}catch{return send(res,400,{error:'JSON inválido.'});}
+          try{
+            const client=validClientCreds(body.clientId,body.clientSecret);
+            const start=createAuthorization(process.env,resolveRedirectUri(req),client);
+            return send(res,200,{url:start.url},'application/json; charset=utf-8',false,{'set-cookie':start.cookie});
+          }catch(e){return send(res,400,{error:e?.message||'Credenciais inválidas.'});}
+        }
         if(req.method!=='GET')return send(res,405,{error:'Método inválido.'});
         try{
           const start=createAuthorization(process.env,resolveRedirectUri(req));
@@ -224,7 +235,8 @@
             error.message.includes('tokens inválida')?'response':
             error.message.includes('Código de autorização')?'code':
             error.message.includes('Autorização não foi concluída')?'denied':'unknown';
-          res.writeHead(303,{'location':'/?ml=error&reason='+reason,
+          const detail=(error.message.match(/codigo=([a-z_]{3,40})/)||[])[1]||'';
+          res.writeHead(303,{'location':'/?ml=error&reason='+reason+(detail?'&detail='+detail:''),
             'cache-control':'no-store','referrer-policy':'no-referrer'});
           return res.end();
         }
