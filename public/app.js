@@ -215,7 +215,7 @@
   document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('[data-step]').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
-    const t = {1: 'step-anuncio', 2: 'step-mensagem', 3: 'step-grupos'}[b.dataset.step];
+    const t = {0: 'step-conexoes', 1: 'step-anuncio', 2: 'step-mensagem', 3: 'step-grupos'}[b.dataset.step];
     document.getElementById(t)?.scrollIntoView({behavior: 'smooth'});
   }));
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
@@ -256,6 +256,43 @@
     setTimeout(waRefresh, 2500);
   });
   el('ml-connect').addEventListener('click', () => window.location.assign('/api/ml/start'));
+  el('ml-disconnect').addEventListener('click', async () => {
+    try {
+      const r = await fetch('/api/ml/disconnect', {method: 'POST', credentials: 'same-origin'});
+      if (!r.ok) throw new Error();
+      toast('Mercado Livre desconectado.');
+    } catch { toast('Não foi possível desconectar.', true); }
+    mlConnectionStatus();
+  });
+  el('shopee-help').addEventListener('click', () => {
+    toast('No Render: Environment → SHOPEE_APP_ID e SHOPEE_APP_SECRET do app de afiliados Shopee.');
+    el('shopee-hint').textContent = 'No Render, em Environment, cadastre SHOPEE_APP_ID e SHOPEE_APP_SECRET (painel de afiliados Shopee). Depois aguarde o redeploy.';
+  });
+  async function mlConnectionStatus() {
+    const st = el('ml-status'), c = el('ml-connect'), d = el('ml-disconnect');
+    try {
+      const r = await fetch('/api/ml/status', {credentials: 'same-origin', cache: 'no-store'});
+      if (!r.ok) throw new Error();
+      const s = await r.json();
+      c.disabled = !s.configured || s.connected;
+      d.disabled = !s.connected;
+      st.textContent = s.connected
+        ? 'Conectado. Preços oficiais ativos.'
+        : s.configured
+          ? 'App configurado. Clique em Conectar.'
+          : 'Falta configurar ML_CLIENT_ID/SECRET no Render.';
+    } catch {
+      st.textContent = 'Não foi possível verificar.';
+      c.disabled = true; d.disabled = true;
+    }
+    try {
+      const r = await fetch('/api/integration-status', {cache: 'no-store'});
+      const s = await r.json();
+      el('shopee-status').textContent = (s.shopee?.appIdConfigured && s.shopee?.appSecretConfigured)
+        ? 'Conectado via chave do app. Preços oficiais ativos.'
+        : 'Não conectado. Cadastre a chave no Render (botão abaixo).';
+    } catch { el('shopee-status').textContent = 'Não foi possível verificar.'; }
+  }
   el('clear-btn').addEventListener('click', () => {
     ['ad-url', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).value = '');
     el('f-platform').selectedIndex = 0;
@@ -273,6 +310,7 @@
   }
   const hadDraft = restoreDraft();
   if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();
+  mlConnectionStatus();
   waRefresh();
   clearInterval(waTimer);
   waTimer = setInterval(waRefresh, 5000);

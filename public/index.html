@@ -14,6 +14,7 @@
     <div class="brand"><div class="brand-icon">✦</div><div><strong>Central de<br>Achadinhos</strong><span>REPLICADOR WHATSAPP</span></div></div>
     <div class="nav-caption">PASSOS</div>
     <nav class="side-nav" aria-label="Passos">
+      <button class="nav-btn" data-step="0"><span class="nav-emoji">🔌</span> Conexões</button>
       <button class="nav-btn active" data-step="1"><span class="nav-emoji">🔗</span> 1. Anúncio</button>
       <button class="nav-btn" data-step="2"><span class="nav-emoji">💬</span> 2. Mensagem</button>
       <button class="nav-btn" data-step="3"><span class="nav-emoji">↗</span> 3. Grupos</button>
@@ -27,6 +28,25 @@
       <div class="top-actions"><span class="top-date" id="today-label"></span><span id="wa-pill" class="status-pill rascunho">WhatsApp: verificando…</span></div>
     </header>
 
+    <section class="panel form-panel" id="step-conexoes">
+      <div class="panel-head"><div><h3>🔌 Conexões das lojas</h3><p>Conecte para puxar preços oficiais automaticamente. Sem conexão, a busca usa dados públicos.</p></div></div>
+      <div class="dashboard-grid">
+        <div class="panel">
+          <div class="panel-head"><div><h3>💛 Mercado Livre</h3><p id="ml-status">Verificando…</p></div></div>
+          <div class="composer-actions"><button type="button" id="ml-connect" class="btn btn-primary">Conectar</button><button type="button" id="ml-disconnect" class="btn btn-outline">Desconectar</button></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><h3>🧡 Shopee</h3><p id="shopee-status">Verificando…</p></div></div>
+          <p class="tiny-warning" id="shopee-hint">A Shopee usa chave do app, sem botão de login.</p>
+          <div class="composer-actions"><button type="button" id="shopee-help" class="btn btn-outline">Como conectar</button></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><h3>🎵 TikTok Shop</h3><p id="tiktok-status">Extração direta da página, sempre ativa.</p></div></div>
+          <p class="tiny-warning">O TikTok não tem API pública de afiliados: título e foto vêm da página e o preço precisa de conferência manual.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="panel form-panel" id="step-anuncio">
       <div class="panel-head"><div><h3>🔗 1. Anúncio</h3><p>Cole o link do produto para puxar título, preço e foto. Nada é salvo.</p></div></div>
       <div class="import-box">
@@ -37,7 +57,7 @@
       <div class="form-row"><label class="field"><span>Preço atual (R$)</span><input id="f-price" inputmode="decimal" maxlength="16" placeholder="49,90"></label><label class="field"><span>Preço anterior (R$) <small>opcional</small></span><input id="f-old" inputmode="decimal" maxlength="16" placeholder="79,90"></label></div>
       <div class="form-row"><label class="field"><span>Cupom <small>opcional</small></span><input id="f-coupon" maxlength="70" placeholder="CUPOM10"></label><label class="field"><span>Seu link de afiliado</span><input id="f-link" type="url" autocomplete="url" placeholder="https://..."></label></div>
       <label class="field"><span>URL da foto <small>opcional — vai junto na mensagem</small></span><input id="f-image" type="url" autocomplete="url" placeholder="https://...imagem.jpg"></label>
-      <div class="composer-actions"><button type="button" id="ml-connect" class="btn btn-outline">Conectar Mercado Livre</button><button type="button" id="clear-btn" class="btn btn-outline">Limpar</button><button type="button" id="build-btn" class="btn btn-primary">Gerar mensagem →</button></div>
+      <div class="composer-actions"><button type="button" id="clear-btn" class="btn btn-outline">Limpar</button><button type="button" id="build-btn" class="btn btn-primary">Gerar mensagem →</button></div>
     </section>
 
     <section class="panel form-panel" id="step-mensagem">
