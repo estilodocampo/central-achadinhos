@@ -119,6 +119,7 @@
       el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.')
         + (d.shopeeSource === 'navegador' ? ' (usando SUA chave Shopee)' : '');
       buildMessage();
+      el('ad-url').value = '';
       saveDraft();
       toast(d.price != null ? 'Dados puxados. Revise e replique.' : 'Sem preço confirmado — complete manualmente.', d.price == null);
     } catch (e) {
