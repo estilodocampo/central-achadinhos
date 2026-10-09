@@ -105,6 +105,7 @@
       const d = await r.json();
       if (serial !== importSerial) return;
       if (!r.ok) throw new Error(d.error || 'Prévia indisponível.');
+      const prevFetched = lastFetched;
       lastFetched = url;
       const p = platformForLink(url);
       if (p) el('f-platform').value = p;
@@ -112,7 +113,7 @@
       if (typeof d.price === 'number' && d.price > 0) el('f-price').value = d.price.toFixed(2).replace('.', ',');
       if (typeof d.oldPrice === 'number' && d.oldPrice > (d.price || 0)) el('f-old').value = d.oldPrice.toFixed(2).replace('.', ',');
       if (d.image) el('f-image').value = d.image;
-      if (!el('f-link').value) el('f-link').value = url;
+      if (!el('f-link').value || el('f-link').value === prevFetched) el('f-link').value = url;
       el('fetch-status').className = 'assist-message ' + (d.price != null ? 'success' : 'error');
       el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.')
         + (d.shopeeSource === 'navegador' ? ' (usando SUA chave Shopee)' : '');
