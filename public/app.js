@@ -263,6 +263,14 @@
     toast('Campos limpos.');
   });
   if (new URLSearchParams(window.location.search).get('ml') === 'connected') toast('Mercado Livre conectado para buscar preços.');
+  if (new URLSearchParams(window.location.search).get('ml') === 'error') {
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    toast(reason === 'token'
+      ? 'O Mercado Livre recusou (HTTP 400). Confira ML_CLIENT_SECRET no Render, o redirect https://central-achadinhos.onrender.com/api/ml/callback no app ML e conclua em poucos minutos.'
+      : 'Falha ao conectar o Mercado Livre. Tente de novo.', true);
+    el('fetch-status').className = 'assist-message error';
+    el('fetch-status').textContent = 'Conexão ML falhou. Sem ela, o preço de links de vitrine/perfil precisa ser manual.';
+  }
   const hadDraft = restoreDraft();
   if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();
   waRefresh();

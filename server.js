@@ -118,7 +118,8 @@
         const ids=mercadoIdsFromPage(html,target.href,hops);
         const itemId=ids.itemId||direct.itemId;
         const catalogId=ids.catalogId||direct.catalogId;
-        trace.identifier=itemId?'item':catalogId?'catalog':'unknown';
+        const imageItemId=(!itemId&&product.itemIdSource==='og:image')?product.itemId:'';
+        trace.identifier=itemId||imageItemId?'item':catalogId?'catalog':'unknown';
         if(advancePrice)Object.assign(product,advancePrice);
         else if(!trace.configured&&itemId){
           // ID vindo do HTML exige conferir o título antes de usar o preço público.
@@ -151,6 +152,15 @@
                   priceSource:'Oferta vencedora do catálogo (confirmar variação)'});
                 trace.api='ok';
               }
+            }
+          }else if(imageItemId){
+            // ID veio da foto do anúncio (og:image): confirma o título antes de usar.
+            const confirmation=await verifyItem(imageItemId,product.title,mlToken);
+            if(!confirmation.verified)trace.api=confirmation.status;
+            else{
+              const official=await officialMLPrice(imageItemId,mlToken);
+              trace.api=official?'ok':'unavailable';
+              if(official)Object.assign(product,official);
             }
           }
         }

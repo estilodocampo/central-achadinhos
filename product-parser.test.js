@@ -1,7 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {extractProduct,parseBRLPrice} from './product-parser.js';
-
+test('og:image com D_NQ_NP revela o ID do anúncio',()=>{
+  const html='<meta property="og:title" content="Calça Country Feminina">'
+    +'<meta property="og:image" content="https://http2.mlstatic.com/D_NQ_NP_761916-MLB93107766867_092025-O.webp">';
+  const p=extractProduct(html,'https://www.mercadolivre.com.br/social/loja123');
+  assert.equal(p.itemId,'MLB93107766867');
+  assert.equal(p.itemIdSource,'og:image');
+});
+test('og:image de logo não inventa ID',()=>{
+  const html='<meta property="og:title" content="Loja X">'
+    +'<meta property="og:image" content="https://example.com/logo.png">';
+  const p=extractProduct(html,'https://www.mercadolivre.com.br/social/loja123');
+  assert.equal(p.itemId,'');
+});
 test('identifica preço em reais com pontuação brasileira',()=>{
   assert.equal(parseBRLPrice('R$ 1.234,90'),1234.9);
   assert.equal(parseBRLPrice('249,99'),249.99);

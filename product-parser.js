@@ -242,6 +242,11 @@ export function extractProduct(html, url) {
   const category = categoryDirect || categoryBreadcrumb || inference(title);
   const categorySource = categoryDirect ? 'Loja' : categoryBreadcrumb ? 'Navegação da loja' : category ? 'Sugestão pelo título' : '';
   const canonical = tags.get('og:url') || '';
-  const itemId = mercadolivreItemId(page.pathname) || mercadolivreItemId(canonical) || mercadolivreItemId(html.match(/<link\s+[^>]*rel=["']canonical["'][^>]*>/i)?.[0] || '');
-  return {title,image,price,oldPrice,category,categorySource,priceSource,itemId};
+  // Foto de produto do ML carrega o ID no nome do arquivo (D_NQ_NP_...MLB..._).
+  const imgUrl = typeof imageCandidate === 'string' ? imageCandidate : imageCandidate?.url || '';
+  const imgMatch = String(imgUrl).match(/D_NQ_NP_[^"'?\s]*?MLB(\d{7,14})(?![0-9])/i);
+  const imageId = imgMatch ? 'MLB' + imgMatch[1] : '';
+  const itemId = mercadolivreItemId(page.pathname) || mercadolivreItemId(canonical) || mercadolivreItemId(html.match(/<link\s+[^>]*rel=["']canonical["'][^>]*>/i)?.[0] || '') || imageId;
+  const itemIdSource = imageId && itemId === imageId ? 'og:image' : 'url';
+  return {title,image,price,oldPrice,category,categorySource,priceSource,itemId,itemIdSource};
 }
