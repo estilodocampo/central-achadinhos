@@ -33,19 +33,19 @@
       <div class="panel-head"><div><h3>🔌 Conexões das lojas</h3><p>Conecte para puxar preços oficiais automaticamente. Sem conexão, a busca usa dados públicos.</p></div></div>
       <div class="dashboard-grid">
         <div class="panel">
-          <div class="panel-head"><div><h3>💛 Mercado Livre</h3><p id="ml-status">Verificando…</p></div></div>
+          <div class="panel-head"><div><h3>💛 Mercado Livre <span class="conn-badge off" id="badge-ml">NÃO CONECTADO</span></h3><p id="ml-status">Verificando…</p></div></div>
           <p class="tiny-warning">Use as chaves do SEU app (sem login na conta): cada usuário conecta com o próprio App ID + Secret. Cadastre este retorno no seu app ML: <code id="ml-callback-url">/api/ml/callback</code></p>
           <div class="form-row"><label class="field"><span>Seu App ID</span><input id="ml-client-id" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="Só números"></label><label class="field"><span>Seu Client Secret</span><input id="ml-client-secret" type="password" maxlength="256" autocomplete="off" placeholder="Cole do painel de devs ML"></label></div>
           <div class="composer-actions"><button type="button" id="ml-save" class="btn btn-outline">Salvar chaves</button><button type="button" id="ml-forget" class="btn btn-outline">Apagar</button><button type="button" id="ml-connect" class="btn btn-primary">Conectar</button><button type="button" id="ml-disconnect" class="btn btn-outline">Desconectar</button></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><div><h3>🧡 Shopee</h3><p id="shopee-status">Verificando…</p></div></div>
+          <div class="panel-head"><div><h3>🧡 Shopee <span class="conn-badge off" id="badge-shopee">NÃO CONECTADO</span></h3><p id="shopee-status">Verificando…</p></div></div>
           <div class="form-row"><label class="field"><span>Seu App ID</span><input id="shopee-id" inputmode="numeric" maxlength="32" autocomplete="off" placeholder="Só números"></label><label class="field"><span>Seu App Secret</span><input id="shopee-secret" type="password" maxlength="256" autocomplete="off" placeholder="Cole do portal de afiliados"></label></div>
           <p class="tiny-warning">Cada cliente usa a própria chave, salva só neste navegador. Sem chave aqui, vale a do servidor.</p>
           <div class="composer-actions"><button type="button" id="shopee-save" class="btn btn-primary">Salvar chaves</button><button type="button" id="shopee-clear" class="btn btn-outline">Apagar</button></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><div><h3>🎵 TikTok Shop</h3><p id="tiktok-status">Extração direta da página, sempre ativa.</p></div></div>
+          <div class="panel-head"><div><h3>🎵 TikTok Shop <span class="conn-badge off" id="badge-tiktok">NÃO CONECTADO</span></h3><p id="tiktok-status">Extração direta da página, sempre ativa.</p></div></div>
           <div class="form-row"><label class="field"><span>Seu App Key <small>opcional</small></span><input id="tiktok-key" maxlength="64" autocomplete="off" placeholder="Quando tiver app aprovado"></label><label class="field"><span>Seu App Secret <small>opcional</small></span><input id="tiktok-secret" type="password" maxlength="256" autocomplete="off" placeholder="Quando tiver app aprovado"></label></div>
           <p class="tiny-warning">A API oficial exige app aprovado pelo TikTok por vendedor. Enquanto isso, título e foto vêm da página; o preço precisa de conferência. Chaves salvas só neste navegador.</p>
           <div class="composer-actions"><button type="button" id="tiktok-save" class="btn btn-primary">Salvar chaves</button><button type="button" id="tiktok-clear" class="btn btn-outline">Apagar</button></div>

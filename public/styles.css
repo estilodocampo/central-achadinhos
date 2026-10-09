@@ -27,3 +27,8 @@
 .wa-bubble .wa-empty{color:#84909d;font-style:italic}
 .wa-time{text-align:right;font-size:10.5px;color:#667781;margin-top:3px}
 @media(max-width:900px){.msg-grid{grid-template-columns:1fr}.msg-phone{position:static}}
+
+
+.conn-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.8px;padding:3px 10px;border-radius:999px;vertical-align:middle;margin-left:8px}
+.conn-badge.ok{background:#e6f7ee;color:#0d7a3f;border:1px solid #0d7a3f33}
+.conn-badge.off{background:#eef1f4;color:#84909d;border:1px solid #c6d2dd}

@@ -493,6 +493,15 @@
     el('shopee-status').textContent = mine
       ? 'Conectado com SUA chave neste navegador.'
       : server ? 'Conectado via chave do servidor.' : 'Sem chave: preços Shopee sem confirmação oficial.';
+    setBadge('badge-shopee', Boolean(mine || server));
+  }
+  function refreshTiktokBadge() {
+    let has = false;
+    try {
+      const t = JSON.parse(localStorage.getItem(TIKTOK_CREDS) || 'null');
+      has = Boolean(t?.key && String(t.secret || '').length >= 8);
+    } catch {}
+    setBadge('badge-tiktok', has);
   }
   el('shopee-save').addEventListener('click', () => {
     const id = el('shopee-id').value.trim(), secret = el('shopee-secret').value.trim();
@@ -515,12 +524,14 @@
     try { localStorage.setItem(TIKTOK_CREDS, JSON.stringify({key, secret})); } catch {}
     el('tiktok-secret').value = '';
     el('tiktok-status').textContent = 'Chaves salvas neste navegador. Ativação na API oficial do TikTok.';
+    refreshTiktokBadge();
     toast('Chaves TikTok salvas neste navegador.');
   });
   el('tiktok-clear').addEventListener('click', () => {
     try { localStorage.removeItem(TIKTOK_CREDS); } catch {}
     el('tiktok-key').value = ''; el('tiktok-secret').value = '';
     el('tiktok-status').textContent = 'Extração direta da página, sempre ativa.';
+    refreshTiktokBadge();
     toast('Chaves TikTok apagadas.');
   });
   (function fillCredFields() {
@@ -528,7 +539,14 @@
     if (s?.id) el('shopee-id').value = s.id;
     const t = readCreds(TIKTOK_CREDS);
     if (t?.key) { el('tiktok-key').value = t.key; el('tiktok-status').textContent = 'Chaves salvas neste navegador. Ativação na API oficial do TikTok.'; }
+    refreshTiktokBadge();
   })();
+  function setBadge(id, on) {
+    const b = el(id);
+    if (!b) return;
+    b.className = 'conn-badge ' + (on ? 'ok' : 'off');
+    b.textContent = on ? 'CONECTADO' : 'NÃO CONECTADO';
+  }
   async function mlConnectionStatus() {
     const st = el('ml-status'), c = el('ml-connect'), d = el('ml-disconnect');
     const mine = (typeof mlCreds === 'function') ? mlCreds() : null;
@@ -548,6 +566,7 @@
           : s.configured
             ? 'App do servidor configurado. Clique em Conectar.'
             : 'Cole seu App ID + Secret acima e clique Salvar.';
+      setBadge('badge-ml', Boolean(s.connected));
     } catch {
       st.textContent = 'Não foi possível verificar.';
       c.disabled = true; d.disabled = true;
