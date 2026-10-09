@@ -56,13 +56,15 @@ export function parseShopeeOffer(json, ids) {
   if(!title)return null;
   let image='';
   try {const parsed=new URL(item.imageUrl);if(parsed.protocol==='https:')image=parsed.href;}catch{}
+  let affiliateUrl='';
+  try {const a=new URL(String(item.offerLink||''));if(a.protocol==='https:')affiliateUrl=a.href;}catch{}
   const low=parseBRLPrice(item.priceMin);
   const high=parseBRLPrice(item.priceMax);
   // Variantes com valores distintos não possuem preço único confirmado.
   const range=low!==null && high!==null && low!==high;
   const price=range?null:(low??high);
   const category=extractProduct('<meta property="og:title" content="'+title.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'">','https://shopee.com.br/product/1/1').category;
-  return {title,image,price,category,categorySource:category?'Sugestão pelo título':'',
+  return {title,image,price,affiliateUrl,category,categorySource:category?'Sugestão pelo título':'',
     priceSource:price!==null?'API oficial Shopee Afiliados':'',
     priceNote:range?'Produto com variações de preço na Shopee. Confira a variação selecionada antes de divulgar.'
       :price!==null?'Preço encontrado na API oficial Shopee. Confirme a variação e frete antes de divulgar.'

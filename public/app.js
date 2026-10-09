@@ -117,7 +117,16 @@
       if (typeof d.oldPrice === 'number' && d.oldPrice > (d.price || 0)) el('f-old').value = d.oldPrice.toFixed(2).replace('.', ',');
       if (d.image) el('f-image').value = d.image;
       updatePhotoPreview();
-      if (!el('f-link').value || el('f-link').value === prevFetched) el('f-link').value = url;
+      // Link DE AFILIADO no lugar do original: Shopee vem da API com sua chave;
+      // ML usa seu matt_tool/word. Respeita edição manual.
+      const prevLink = el('f-link').value;
+      if (!prevLink || prevLink === prevFetched) {
+        if (d.affiliateUrl) el('f-link').value = d.affiliateUrl;
+        else if (typeof applyMLAffiliateLocal === 'function') {
+          const mine = applyMLAffiliateLocal(url);
+          if (mine) el('f-link').value = mine;
+        }
+      }
       el('fetch-status').className = 'assist-message ' + (d.price != null ? 'success' : 'error');
       el('fetch-status').textContent = (d.priceNote || 'Confira o preço na loja.')
         + (d.shopeeSource === 'navegador' ? ' (usando SUA chave Shopee)' : '');
@@ -322,6 +331,11 @@
       if (c.from) el('clone-from').value = c.from;
       if (c.to) el('clone-to').value = c.to;
       el('clone-on').checked = c.enabled === true;
+      if (c.affiliate) {
+        if (c.affiliate.mlTool) el('aff-ml-tool').value = c.affiliate.mlTool;
+        if (c.affiliate.mlWord) el('aff-ml-word').value = c.affiliate.mlWord;
+        el('aff-shopee-convert').checked = c.affiliate.shopeeConvert === true;
+      }
       st.className = 'assist-message ' + (c.enabled ? 'success' : '');
       st.textContent = c.enabled
         ? ('Ligado: clonando para ' + (((g.groups || []).find(x => x.id === c.to) || {}).name || c.to) + ' • ' + (c.cloned || 0) + ' replicadas.')
@@ -335,6 +349,49 @@
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha.');
       toast(d.enabled ? 'Clonador ligado!' : 'Clonador salvo (desligado).');
+      refreshClone();
+    } catch (e) { toast(e.message || 'Falha ao salvar.', true); }
+  });
+  const ML_AFF = 'ml-affiliate-v1';
+  function mlAff() {
+    try {
+      const c = JSON.parse(localStorage.getItem(ML_AFF) || 'null');
+      if (c && /^\d{4,20}$/.test(String(c.tool || '')) && /^[A-Za-z0-9._-]{2,60}$/.test(String(c.word || ''))) {
+        return {tool: String(c.tool), word: String(c.word)};
+      }
+    } catch {}
+    return null;
+  }
+  function applyMLAffiliateLocal(rawUrl) {
+    const cfg = mlAff();
+    if (!cfg) return '';
+    try {
+      const u = new URL(rawUrl);
+      if (u.protocol !== 'https:') return '';
+      const h = u.hostname.toLowerCase();
+      if (!['mercadolivre.com.br', 'mercadolivre.com', 'mercadolibre.com'].some(m => h === m || h.endsWith('.' + m))) return '';
+      u.searchParams.delete('matt_tool'); u.searchParams.delete('matt_word'); u.searchParams.delete('matt_origin');
+      u.searchParams.set('matt_tool', cfg.tool);
+      u.searchParams.set('matt_word', cfg.word);
+      return u.href;
+    } catch { return ''; }
+  }
+  el('aff-save').addEventListener('click', async () => {
+    const tool = el('aff-ml-tool').value.trim(), word = el('aff-ml-word').value.trim();
+    const convert = el('aff-shopee-convert').checked;
+    if ((tool || word) && (!/^\d{4,20}$/.test(tool) || !/^[A-Za-z0-9._-]{2,60}$/.test(word))) {
+      return toast('matt_tool (só números) e matt_word inválidos.', true);
+    }
+    const sc = shopeeCreds();
+    if (convert && !sc) return toast('Salve sua chave Shopee na etapa Conexões primeiro.', true);
+    try { localStorage.setItem(ML_AFF, JSON.stringify({tool, word})); } catch {}
+    try {
+      const r = await fetch('/api/wa/clone', {method: 'POST', headers: {'content-type': 'application/json'},
+        body: JSON.stringify({affiliate: {mlTool: tool, mlWord: word, shopeeConvert: convert,
+          shopeeId: sc?.id || '', shopeeSecret: sc?.secret || ''}})});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Falha.');
+      toast('Seus links valem no clone e na importação.');
       refreshClone();
     } catch (e) { toast(e.message || 'Falha ao salvar.', true); }
   });

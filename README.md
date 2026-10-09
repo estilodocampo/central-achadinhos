@@ -1,4 +1,4 @@
-# Central de Achadinhos — Replicador v1.7.0 (modo comercial)
+# Central de Achadinhos — Replicador v1.8.0 (modo comercial)
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — cada cliente conecta as próprias contas no painel.
 
@@ -16,6 +16,11 @@ Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus gr
 - **TikTok Shop**: campos App Key + Secret salvos no navegador (prontos para a API oficial quando o app do vendedor for aprovado). Hoje a extração é direta da página.
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — só o login do WhatsApp é guardado (como "manter conectado"), igual à loja.
+
+## Meus links no lugar do original (etapa 4 e importação)
+- **Shopee**: com SUA chave conectada, a importação preenche o campo com seu `offerLink` oficial. No clone, marque "Converter links Shopee" para trocar cada link clonado pelo seu.
+- **Mercado Livre**: salve `matt_tool` + `matt_word` em Meus links. Na importação, o campo sai com seus parâmetros; no clone, links `meli.la` são expandidos e remarcados com os seus.
+- Segredos nunca aparecem em resposta, log ou tela (só flags tipo "tem chave").
 
 ## Clonador de grupos (etapa 4)
 

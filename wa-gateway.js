@@ -5,6 +5,8 @@ import {DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore
 import pino from "pino";
 import QRCode from "qrcode";
 import {loadAuthState, clearAuthState, storeMode, getCfg, setCfg} from "./wa-store.js";
+import {rewriteLinksInText, validMLAffiliate} from "./affiliate.js";
+import {parseShopeeIds, officialShopeeProduct, userShopeeCreds} from "./shopee-affiliate.js";
 
 const MAX_GROUPS_PER_SEND = 20;
 const MAX_MESSAGE = 2000;
@@ -177,7 +179,8 @@ export function startWhatsApp() {
 }
 
 // ---------- Clonador de grupos ----------
-const clone = {enabled: false, from: "", to: "", cloned: 0, lastAt: 0, lastError: ""};
+const clone = {enabled: false, from: "", to: "", cloned: 0, lastAt: 0, lastError: "",
+  aff: {mlTool: "", mlWord: "", shopeeConvert: false, shopeeId: "", shopeeSecret: ""}};
 let cloneLoaded = false;
 async function loadClone() {
   if (cloneLoaded) return;
@@ -190,12 +193,22 @@ async function loadClone() {
       clone.to = isGroupJid(c.to) ? c.to : "";
       clone.cloned = Number(c.cloned) || 0;
       clone.lastAt = Number(c.lastAt) || 0;
+      if (c.aff && typeof c.aff === "object") {
+        clone.aff.mlTool = /^\d{4,20}$/.test(String(c.aff.mlTool || "")) ? String(c.aff.mlTool) : "";
+        clone.aff.mlWord = /^[A-Za-z0-9._-]{2,60}$/.test(String(c.aff.mlWord || "")) ? String(c.aff.mlWord) : "";
+        clone.aff.shopeeConvert = c.aff.shopeeConvert === true;
+        clone.aff.shopeeId = /^\d{3,32}$/.test(String(c.aff.shopeeId || "")) ? String(c.aff.shopeeId) : "";
+        clone.aff.shopeeSecret = String(c.aff.shopeeSecret || "").length >= 8 ? String(c.aff.shopeeSecret) : "";
+        if (!clone.aff.shopeeId || !clone.aff.shopeeSecret) { clone.aff.shopeeConvert = false; clone.aff.shopeeId = ""; clone.aff.shopeeSecret = ""; }
+      }
       if (!clone.from || !clone.to || clone.from === clone.to) clone.enabled = false;
     }
   } catch {}
 }
 function saveClone() {
-  setCfg("clone", {enabled: clone.enabled, from: clone.from, to: clone.to, cloned: clone.cloned, lastAt: clone.lastAt}).catch(() => {});
+  setCfg("clone", {enabled: clone.enabled, from: clone.from, to: clone.to, cloned: clone.cloned, lastAt: clone.lastAt,
+    aff: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord, shopeeConvert: clone.aff.shopeeConvert,
+      shopeeId: clone.aff.shopeeId, shopeeSecret: clone.aff.shopeeSecret}}).catch(() => {});
 }
 // Decisão pura/testável: só texto e foto, nunca as próprias mensagens (anti-loop).
 export function shouldClone(msg, cfg) {
@@ -229,9 +242,11 @@ async function handleIncoming(upsert) {
     try {
       if (job.kind === "image") {
         const buf = await sock.downloadMediaMessage(msg, "buffer", {});
-        await sock.sendMessage(clone.to, {image: buf, caption: job.caption});
+        const caption = (await applyAffiliateToText(job.caption, clone.aff)).text;
+        await sock.sendMessage(clone.to, {image: buf, caption});
       } else {
-        await sock.sendMessage(clone.to, {text: job.text});
+        const text = (await applyAffiliateToText(job.text, clone.aff)).text;
+        await sock.sendMessage(clone.to, {text});
       }
       clone.cloned++;
       clone.lastAt = Date.now();
@@ -243,14 +258,92 @@ async function handleIncoming(upsert) {
     await new Promise((r) => setTimeout(r, 1000));
   }
 }
-export async function setClone({from, to, enabled}) {
+// Expande links curtos (meli.la, shope.ee) para a URL final quando ela for
+// de loja conhecida. Qualquer falha mantém o link original.
+async function expandShortLinks(text, shortHosts, finalOk) {
+  const found = String(text || "").match(/https?:\/\/[^\s<>"')]+/g) || [];
+  let out = String(text || "");
+  let n = 0;
+  for (const raw of found) {
+    if (n >= 5) break;
+    let u;
+    try { u = new URL(raw.replace(/[.,;:!?)]+$/, "")); } catch { continue; }
+    const h = u.hostname.toLowerCase();
+    if (!shortHosts.some((m) => h === m || h.endsWith("." + m))) continue;
+    try {
+      const r = await fetch(u.href, {method: "GET", redirect: "follow",
+        signal: AbortSignal.timeout(8000), headers: {"user-agent": "Mozilla/5.0"}});
+      try { await r.body?.cancel?.(); } catch {}
+      const fin = new URL(r.url);
+      if (fin.protocol === "https:" && finalOk(fin.hostname)) {
+        out = out.split(raw).join(fin.href);
+        n++;
+      }
+    } catch {}
+  }
+  return out;
+}
+async function convertShopeeLinks(text, creds) {
+  const found = String(text || "").match(/https?:\/\/[^\s<>"')]+/g) || [];
+  let out = String(text || ""), replaced = 0;
+  let n = 0;
+  for (const raw of found) {
+    if (n >= 5) break;
+    const clean = raw.replace(/[.,;:!?)]+$/, "");
+    const ids = parseShopeeIds(clean);
+    if (!ids) continue;
+    n++;
+    try {
+      const off = await officialShopeeProduct(ids, {appId: creds.appId, secret: creds.secret});
+      if (off?.affiliateUrl) { out = out.split(raw).join(off.affiliateUrl); replaced++; }
+    } catch {}
+  }
+  return {text: out, replaced};
+}
+async function applyAffiliateToText(text, aff) {
+  let out = String(text || ""), replaced = 0;
+  try {
+    if (aff?.mlTool && aff?.mlWord) {
+      out = await expandShortLinks(out, ["meli.la"], (h) =>
+        ["mercadolivre.com.br", "mercadolivre.com", "mercadolibre.com"].some((m) => h === m || h.endsWith("." + m)));
+      const r = rewriteLinksInText(out, {tool: aff.mlTool, word: aff.mlWord});
+      out = r.text; replaced += r.replaced;
+    }
+    if (aff?.shopeeConvert && aff?.shopeeId && aff?.shopeeSecret) {
+      out = await expandShortLinks(out, ["shope.ee"], (h) =>
+        ["shopee.com.br", "shopee.com"].some((m) => h === m || h.endsWith("." + m)));
+      const r2 = await convertShopeeLinks(out, {appId: aff.shopeeId, secret: aff.shopeeSecret});
+      out = r2.text; replaced += r2.replaced;
+    }
+  } catch {}
+  return {text: out, replaced};
+}
+export async function setClone({from, to, enabled, affiliate}) {
   await loadClone();
+  if (affiliate !== undefined) {
+    const a = affiliate || {};
+    const tool = String(a.mlTool ?? "").trim(), word = String(a.mlWord ?? "").trim();
+    if (!tool && !word) { clone.aff.mlTool = ""; clone.aff.mlWord = ""; }
+    else {
+      const v = validMLAffiliate(tool, word);
+      clone.aff.mlTool = v.tool; clone.aff.mlWord = v.word;
+    }
+    clone.aff.shopeeConvert = a.shopeeConvert === true;
+    if (a.shopeeId !== undefined || a.shopeeSecret !== undefined) {
+      const c = userShopeeCreds({shopeeAppId: a.shopeeId ?? "", shopeeAppSecret: a.shopeeSecret ?? ""});
+      if (c) { clone.aff.shopeeId = c.appId; clone.aff.shopeeSecret = c.secret; }
+      else { clone.aff.shopeeId = ""; clone.aff.shopeeSecret = ""; }
+    }
+    if (clone.aff.shopeeConvert && (!clone.aff.shopeeId || !clone.aff.shopeeSecret)) {
+      throw Error("Para converter Shopee, salve seu App ID + Secret.");
+    }
+  }
   const f = String(from || "").trim(), t = String(to || "").trim();
-  if (enabled) {
+  if (enabled === true) {
     if (!isGroupJid(f) || !isGroupJid(t)) throw Error("Escolha grupos válidos.");
     if (f === t) throw Error("Origem e destino precisam ser grupos diferentes.");
     clone.from = f; clone.to = t; clone.enabled = true;
-  } else {
+  } else if (enabled === false) {
     clone.enabled = false;
     if (f) clone.from = f;
     if (t) clone.to = t;
@@ -260,7 +353,9 @@ export async function setClone({from, to, enabled}) {
 }
 export function cloneStatus() {
   return {enabled: clone.enabled, from: clone.from, to: clone.to,
-    cloned: clone.cloned, lastAt: clone.lastAt || null, lastError: clone.lastError || null};
+    cloned: clone.cloned, lastAt: clone.lastAt || null, lastError: clone.lastError || null,
+    affiliate: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord,
+      shopeeConvert: clone.aff.shopeeConvert, hasShopee: Boolean(clone.aff.shopeeId && clone.aff.shopeeSecret)}};
 }
 
 export async function waStatus() {
