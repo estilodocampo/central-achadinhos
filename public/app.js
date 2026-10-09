@@ -113,9 +113,13 @@
       const p = platformForLink(url);
       if (p) el('f-platform').value = p;
       if (d.title) el('f-title').value = d.title;
+      else el('f-title').value = '';
       if (typeof d.price === 'number' && d.price > 0) el('f-price').value = d.price.toFixed(2).replace('.', ',');
+      else el('f-price').value = '';
       if (typeof d.oldPrice === 'number' && d.oldPrice > (d.price || 0)) el('f-old').value = d.oldPrice.toFixed(2).replace('.', ',');
+      else el('f-old').value = '';
       if (d.image) el('f-image').value = d.image;
+      else el('f-image').value = '';
       updatePhotoPreview();
       // Link DE AFILIADO no lugar do original: Shopee vem da API com sua chave;
       // ML usa seu matt_tool/word. Respeita edição manual.
