@@ -81,9 +81,14 @@
     m += '\n\n⚠️ Preço e disponibilidade sujeitos a alteração.\n🔗 Link de afiliado.';
     el('message').value = m;
   }
-  async function fetchPreview() {
+  let importTimer = null;
+  let importSerial = 0;
+  let lastFetched = '';
+  async function fetchPreview(auto = false) {
     const url = el('ad-url').value.trim();
     if (!url) return toast('Cole o link do anúncio.', true);
+    if (auto && url === lastFetched) return;
+    const serial = ++importSerial;
     syncPlatformFromLink();
     buildMessage();
     const btn = el('fetch-btn');
@@ -93,7 +98,9 @@
     try {
       const r = await fetch('/api/preview', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({url})});
       const d = await r.json();
+      if (serial !== importSerial) return;
       if (!r.ok) throw new Error(d.error || 'Prévia indisponível.');
+      lastFetched = url;
       const p = platformForLink(url);
       if (p) el('f-platform').value = p;
       if (d.title) el('f-title').value = d.title;
@@ -113,8 +120,15 @@
       saveDraft();
       el('fetch-status').className = 'assist-message error';
       el('fetch-status').textContent = (e.message || 'Falha.') + ' Preencha manualmente.';
+      if (serial !== importSerial) return;
       toast('A loja não liberou os dados.', true);
-    } finally { btn.disabled = false; btn.textContent = 'Buscar dados'; }
+    } finally { if (serial === importSerial) { btn.disabled = false; btn.textContent = 'Buscar dados'; } }
+  }
+  function scheduleAutoImport() {
+    clearTimeout(importTimer);
+    const url = el('ad-url').value.trim();
+    if (!url || url === lastFetched || !platformForLink(url)) return;
+    importTimer = setTimeout(() => fetchPreview(true), 600);
   }
   async function copyText() {
     const v = el('message').value;
@@ -205,7 +219,7 @@
     document.getElementById(t)?.scrollIntoView({behavior: 'smooth'});
   }));
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
-  el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); });
+  el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); scheduleAutoImport(); });
   el('message').addEventListener('input', saveDraft);
   document.addEventListener('change', e => { if (e.target?.matches?.('[data-group]')) saveDraft(); });
   el('fetch-btn').addEventListener('click', fetchPreview);
