@@ -14,8 +14,8 @@
     <div class="brand"><div class="brand-icon">✦</div><div><strong>Central de<br>Achadinhos</strong><span>REPLICADOR WHATSAPP</span></div></div>
     <div class="nav-caption">PASSOS</div>
     <nav class="side-nav" aria-label="Passos">
-      <button class="nav-btn" data-step="0"><span class="nav-emoji">🔌</span> Conexões</button>
-      <button class="nav-btn active" data-step="1"><span class="nav-emoji">🔗</span> 1. Anúncio</button>
+      <button class="nav-btn active" data-step="0"><span class="nav-emoji">🔌</span> Conexões</button>
+      <button class="nav-btn" data-step="1"><span class="nav-emoji">🔗</span> 1. Anúncio</button>
       <button class="nav-btn" data-step="2"><span class="nav-emoji">💬</span> 2. Mensagem</button>
       <button class="nav-btn" data-step="3"><span class="nav-emoji">↗</span> 3. Grupos</button>
     </nav>
@@ -50,9 +50,10 @@
           <div class="composer-actions"><button type="button" id="tiktok-save" class="btn btn-primary">Salvar chaves</button><button type="button" id="tiktok-clear" class="btn btn-outline">Apagar</button></div>
         </div>
       </div>
+      <div class="composer-actions"><button type="button" class="btn btn-primary" data-step="1">Continuar →</button></div>
     </section>
 
-    <section class="panel form-panel" id="step-anuncio">
+    <section class="panel form-panel hidden" id="step-anuncio">
       <div class="panel-head"><div><h3>🔗 1. Anúncio</h3><p>Cole o link do produto para puxar título, preço e foto. Nada é salvo.</p></div></div>
       <div class="import-box">
         <div class="import-inline"><input type="url" id="ad-url" placeholder="Cole o link da Shopee, Mercado Livre ou TikTok" autocomplete="url"><button type="button" id="fetch-btn" class="btn btn-dark">Buscar dados</button></div>
@@ -63,16 +64,16 @@
       <div class="form-row"><label class="field"><span>Cupom <small>opcional</small></span><input id="f-coupon" maxlength="70" placeholder="CUPOM10"></label><label class="field"><span>Seu link de afiliado</span><input id="f-link" type="url" autocomplete="url" placeholder="https://..."></label></div>
       <label class="field"><span>URL da foto <small>opcional — vai junto na mensagem</small></span><input id="f-image" type="url" autocomplete="url" placeholder="https://...imagem.jpg"></label>
       <div id="photo-preview" class="photo-preview" aria-label="Prévia da foto"><span>🛍️</span></div>
-      <div class="composer-actions"><button type="button" id="clear-btn" class="btn btn-outline">Limpar</button><button type="button" id="build-btn" class="btn btn-primary">Gerar mensagem →</button></div>
+      <div class="composer-actions"><button type="button" class="btn btn-outline" data-step="0">← Voltar</button><button type="button" id="clear-btn" class="btn btn-outline">Limpar</button><button type="button" id="build-btn" class="btn btn-primary">Gerar mensagem →</button></div>
     </section>
 
-    <section class="panel form-panel" id="step-mensagem">
+    <section class="panel form-panel hidden" id="step-mensagem">
       <div class="panel-head"><div><h3>💬 2. Mensagem</h3><p>Revise antes de replicar. Edite à vontade.</p></div></div>
       <textarea id="message" rows="11" aria-label="Mensagem de divulgação"></textarea>
-      <div class="composer-actions"><button type="button" id="copy-btn" class="btn btn-outline">Copiar texto</button><button type="button" id="to-groups-btn" class="btn btn-primary">Escolher grupos ↓</button></div>
+      <div class="composer-actions"><button type="button" class="btn btn-outline" data-step="1">← Voltar</button><button type="button" id="copy-btn" class="btn btn-outline">Copiar texto</button><button type="button" id="to-groups-btn" class="btn btn-primary">Escolher grupos ↓</button></div>
     </section>
 
-    <section class="panel form-panel" id="step-grupos">
+    <section class="panel form-panel hidden" id="step-grupos">
       <div class="panel-head"><div><h3>↗ 3. Replicar nos grupos</h3><p>Escaneie o QR com o WhatsApp e selecione os grupos.</p></div><button type="button" id="wa-refresh" class="btn btn-outline btn-sm">Atualizar</button></div>
       <div id="wa-box">
         <p id="wa-status" class="assist-message" role="status">Conectando…</p>
@@ -85,7 +86,7 @@
         </div>
         <div id="qr-wrap" class="hidden"><img id="qr-img" alt="QR para conectar o WhatsApp" width="240" height="240"><p class="tiny-warning">Abra o WhatsApp → Aparelhos conectados → Conectar aparelho → escaneie.</p></div>
         <div id="groups-list" class="publish-list"></div>
-        <div class="composer-actions"><button type="button" id="select-all" class="btn btn-outline">Todos</button><button type="button" id="select-none" class="btn btn-outline">Nenhum</button><button type="button" id="send-btn" class="btn btn-whatsapp">Replicar agora ↗</button><button type="button" id="wa-logout" class="btn btn-outline">Desconectar</button></div>
+        <div class="composer-actions"><button type="button" class="btn btn-outline" data-step="2">← Voltar</button><button type="button" id="select-all" class="btn btn-outline">Todos</button><button type="button" id="select-none" class="btn btn-outline">Nenhum</button><button type="button" id="send-btn" class="btn btn-whatsapp">Replicar agora ↗</button><button type="button" id="wa-logout" class="btn btn-outline">Desconectar</button></div>
         <p class="tiny-warning">Envio automático pela sua conta. Comece com poucos grupos para evitar bloqueio. Nenhum dado é salvo no servidor.</p>
       </div>
     </section>

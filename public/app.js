@@ -248,12 +248,15 @@
     finally { btn.disabled = false; btn.textContent = 'Replicar agora ↗'; }
   }
   el('today-label').textContent = new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'});
-  document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('[data-step]').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    const t = {0: 'step-conexoes', 1: 'step-anuncio', 2: 'step-mensagem', 3: 'step-grupos'}[b.dataset.step];
-    document.getElementById(t)?.scrollIntoView({behavior: 'smooth'});
-  }));
+  const STEP_VIEWS = ['step-conexoes', 'step-anuncio', 'step-mensagem', 'step-grupos'];
+  function showStep(n) {
+    const id = STEP_VIEWS[Number(n)];
+    if (!id || !el(id)) return;
+    STEP_VIEWS.forEach(s => el(s)?.classList.toggle('hidden', s !== id));
+    document.querySelectorAll('.side-nav [data-step]').forEach(x => x.classList.toggle('active', x.dataset.step === String(n)));
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+  document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => showStep(b.dataset.step)));
   ['f-platform', 'f-title', 'f-price', 'f-old', 'f-coupon', 'f-link', 'f-image'].forEach(id => el(id).addEventListener('input', () => { buildMessage(); saveDraft(); }));
   el('ad-url').addEventListener('input', () => { syncPlatformFromLink(); saveDraft(); scheduleAutoImport(); });
   el('message').addEventListener('input', saveDraft);
@@ -262,9 +265,9 @@
   el('fetch-btn').addEventListener('click', fetchPreview);
   el('ad-url').addEventListener('input', syncPlatformFromLink);
   el('ad-url').addEventListener('keydown', e => { if (e.key === 'Enter') fetchPreview(); });
-  el('build-btn').addEventListener('click', () => { buildMessage(); toast('Mensagem pronta.'); document.getElementById('step-mensagem').scrollIntoView({behavior: 'smooth'}); });
+  el('build-btn').addEventListener('click', () => { buildMessage(); saveDraft(); toast('Mensagem pronta.'); showStep(2); });
   el('copy-btn').addEventListener('click', copyText);
-  el('to-groups-btn').addEventListener('click', () => document.getElementById('step-grupos').scrollIntoView({behavior: 'smooth'}));
+  el('to-groups-btn').addEventListener('click', () => showStep(3));
   el('wa-refresh').addEventListener('click', async () => { await waRefresh(); await loadGroups(true); });
   el('select-all').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = true));
   el('select-none').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = false));
@@ -444,6 +447,7 @@
   const hadDraft = restoreDraft();
   if (!hadDraft || !el('message').value) buildMessage(); else saveDraft();
   updatePhotoPreview();
+  showStep(0);
   mlConnectionStatus();
   waRefresh();
   clearInterval(waTimer);
