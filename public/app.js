@@ -70,11 +70,11 @@
     const link = el('f-link').value.trim();
     let m = '🛍️ *ACHADINHO ' + platform.toUpperCase() + '*\n\n🔥 *' + title + '*\n';
     if (!Number.isNaN(price) && price > 0) {
-      m += '\n💰 *Preço: ' + money(price) + '*';
       if (!Number.isNaN(old) && old > price) {
         const off = Math.round((1 - price / old) * 100);
-        m += '\n🏷️ Antes: ' + money(old) + (off ? ' · ' + off + '% OFF' : '');
+        m += '\n🏷️ Antes: ~' + money(old) + '~' + (off ? ' (' + off + '% OFF)' : '');
       }
+      m += '\n💰 *PREÇO DE VENDA: ' + money(price) + '*';
     } else m += '\n💰 *Confira o preço no link*';
     if (coupon) m += '\n🎟️ Cupom: ' + coupon;
     if (link) m += '\n\n🛒 *Veja a oferta:*\n' + link;
@@ -174,7 +174,7 @@
     const c = el('msg-count');
     if (c) c.textContent = v.length + ' caracteres';
     b.innerHTML = v.trim()
-      ? html(v).replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+      ? html(v).replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>').replace(/~([^~\n]+)~/g, '<s>$1</s>').replace(/\n/g, '<br>')
       : '<span class="wa-empty">A mensagem aparece aqui…</span>';
     const clock = el('wa-clock');
     if (clock) clock.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
