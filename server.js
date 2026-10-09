@@ -1,9 +1,9 @@
 (async function boot(){
   const { createServer } = await import('node:http');
   const { extractProduct } = await import('./product-parser.js');
-  const { officialMLPrice } = await import('./mercadolivre-price.js');
+  const { officialMLPrice, publicMLPrice } = await import('./mercadolivre-price.js');
   const { createAuthorization,completeAuthorization,getAuthorizedToken,sessionStatus,clearSessionCookie,resolveRedirectUri } = await import('./ml-oauth.js');
-  const {mercadoIdsFromPage,resolveCatalog,verifyItem} = await import('./mercadolivre-catalog.js');
+  const {mercadoIdsFromPage,resolveCatalog,verifyItem,matchingTitle} = await import('./mercadolivre-catalog.js');
   const {parseShopeeIds,officialShopeeProduct} = await import('./shopee-affiliate.js');
   const { startWhatsApp,waStatus,waGroups,waSend,waLogout,waPairCode } = await import('./wa-gateway.js');
   const { readFile, stat } = await import('node:fs/promises');
@@ -56,6 +56,12 @@
         trace.identifier='item';
         trace.api=official?'ok':'unavailable';
         if(official)advancePrice=official;
+      }else if(direct.itemId&&!trace.configured){
+        // ID explícito na URL é confiável: tenta a API pública sem token.
+        const pub=await publicMLPrice(direct.itemId);
+        trace.identifier='item';
+        trace.api=pub?'ok':'unavailable';
+        if(pub)advancePrice={price:pub.price,oldPrice:pub.oldPrice,priceSource:pub.priceSource};
       }else if(direct.catalogId&&trace.configured){
         trace.identifier='catalog';
         catalogAttempt=await resolveCatalog(direct.catalogId,mlToken);
@@ -114,6 +120,14 @@
         const catalogId=ids.catalogId||direct.catalogId;
         trace.identifier=itemId?'item':catalogId?'catalog':'unknown';
         if(advancePrice)Object.assign(product,advancePrice);
+        else if(!trace.configured&&itemId){
+          // ID vindo do HTML exige conferir o título antes de usar o preço público.
+          const pub=await publicMLPrice(itemId);
+          if(pub&&matchingTitle(product.title,pub.title)){
+            Object.assign(product,{price:pub.price,oldPrice:pub.oldPrice,priceSource:pub.priceSource});
+            trace.api='ok';
+          }else trace.api=pub?'title_mismatch':'unavailable';
+        }
         else if(trace.configured){
           if(itemId){
             const uncertain=ids.evidence?.includes('exige verificar título');
