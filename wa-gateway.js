@@ -181,6 +181,7 @@ export function startWhatsApp() {
 // ---------- Clonador de grupos (pares independentes) ----------
 const clone = {pairs: [], lastError: "",
   aff: {mlTool: "", mlWord: "", shopeeConvert: false, shopeeId: "", shopeeSecret: ""}};
+const cloneDiag = {upserts: 0, seen: 0, fromMe: 0, old: 0, notReady: 0, noEnabled: 0, nomatch: 0, matched: 0, sent: 0, lastJid: "", lastType: "", lastMatch: "", lastErr: ""};
 const MAX_PAIRS = 4;
 const MAX_DESTS = 20;
 function cleanPair(p, i) {
@@ -290,21 +291,23 @@ export function matchPairs(msg, cfg) {
 }
 async function handleIncoming(upsert) {
   await loadClone();
-  if (!sock || !connected) return;
-  if (!clone.pairs.some((p) => p.enabled)) return;
+  const diag = cloneDiag;
+  diag.upserts++;
   const list = upsert?.messages || [];
+  for (const msg of list) diag.seen++;
+  if (!sock || !connected) { diag.notReady++; return; }
+  if (!clone.pairs.some((p) => p.enabled)) { diag.noEnabled++; return; }
   for (const msg of list) {
-    if (msg?.key?.fromMe) continue;
+    diag.lastJid = String(msg?.key?.remoteJid || "");
+    diag.lastType = String((upsert?.type) || "");
+    if (msg?.key?.fromMe) { diag.fromMe++; continue; }
     // Ignora histórico antigo: só mensagens dos últimos 10 min.
     const ts = Number(msg?.messageTimestamp) || 0;
-    if (ts && Date.now() / 1000 - ts > 600) continue;
+    if (ts && Date.now() / 1000 - ts > 600) { diag.old++; continue; }
     const job = shouldClone(msg, {pairs: clone.pairs});
-    if (!job) continue;
-    // Une os alvos de todos os pares que casaram (sem repetir destino).
-    const targets = [];
-    const seen = new Set();
-    const matched = matchPairs(msg, {pairs: clone.pairs});
-    for (const p of matched) for (const t of pairTargets(p)) if (!seen.has(t)) { seen.add(t); targets.push(t); }
+    if (!job) { diag.nomatch++; continue; }
+    diag.matched++;
+    diag.lastMatch = String(msg?.key?.remoteJid || "");
     try {
       let payload;
       if (job.kind === "image") {
@@ -313,15 +316,21 @@ async function handleIncoming(upsert) {
       } else {
         payload = {text: (await applyAffiliateToText(job.text, clone.aff)).text};
       }
+      const targets = [];
+      const seen = new Set();
+      const matched = matchPairs(msg, {pairs: clone.pairs});
+      for (const p of matched) for (const t of pairTargets(p)) if (!seen.has(t)) { seen.add(t); targets.push(t); }
       for (const jid of targets) {
         await sock.sendMessage(jid, payload);
+        diag.sent++;
         await new Promise((r) => setTimeout(r, 800));
       }
       for (const pair of matched) { pair.cloned++; pair.lastAt = Date.now(); }
       clone.lastError = "";
       saveClone();
-    } catch {
+    } catch (e) {
       clone.lastError = "Falha ao replicar mensagem.";
+      diag.lastErr = String(e?.message || e).slice(0, 120);
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
@@ -464,6 +473,7 @@ export async function waStatus() {
     groups: groupsCache.length, groupsAt,
     uptimeSec: Math.round((Date.now() - bootAt) / 1000),
     clone: cloneStatus(),
+    cloneDiag,
     session: storeMode(), maxPerSend: MAX_GROUPS_PER_SEND};
 }
 
