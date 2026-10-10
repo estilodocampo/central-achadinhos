@@ -182,7 +182,7 @@ export function startWhatsApp() {
 const clone = {pairs: [], lastError: "",
   aff: {mlTool: "", mlWord: "", shopeeConvert: false, shopeeId: "", shopeeSecret: ""}};
 const MAX_PAIRS = 4;
-const MAX_DESTS = 4;
+const MAX_DESTS = 20;
 function cleanPair(p, i) {
   const id = String(p?.id || "p" + (i + 1)).slice(0, 12);
   const from = isGroupJid(p?.from) ? String(p.from) : "";

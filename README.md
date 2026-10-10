@@ -1,4 +1,4 @@
-# Central de Achadinhos — Replicador v1.11.0 (modo comercial)
+# Central de Achadinhos — Replicador v1.12.0 (modo comercial)
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — cada cliente conecta as próprias contas no painel.
 
@@ -28,7 +28,7 @@ Cada par segue a ordem **Grupo 1 (origem) → Grupo 2 (Distribuidor) → Grupo 3
 
 - **Grupo 1 (origem)**: um grupo específico (+ origem 2 opcional) ou marque "Grupo 1 = todos os grupos" para usar todos os grupos do WhatsApp conectado.
 - **Grupo 2 (Distribuidor)**: opcional — recebe uma cópia antes de distribuir.
-- **Grupo 3 (destinos)**: vários grupos (até 4 por par).
+- **Grupo 3 (destinos)**: agora é uma **lista com checkboxes** (busca + Todos/Nenhum), até 20 grupos por par — a mesma oferta cai em todos de uma vez.
 
 Anti-loop reforçado: as próprias mensagens são ignoradas, destino nunca é origem e, no modo "todos os grupos", hub e destinos de todos os pares ficam protegidos. A config sobrevive a reinícios; mensagens nunca são salvas.
 
