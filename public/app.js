@@ -336,11 +336,11 @@
   const CLONE_IDS = [1, 2];
   function fillCloneSelects(groups) {
     for (const n of CLONE_IDS) {
-      for (const id of ['clone-from-' + n, 'clone-to-' + n]) {
+      for (const id of ['clone-from-' + n, 'clone-from2-' + n, 'clone-to-' + n]) {
         const sel = el(id);
         if (!sel) continue;
         const keep = sel.value;
-        sel.innerHTML = '<option value="">Escolha o grupo…</option>' + groups.map(g =>
+        sel.innerHTML = '<option value="">' + (id.startsWith('clone-from2') ? 'Nenhuma' : 'Escolha o grupo…') + '</option>' + groups.map(g =>
           '<option value="' + html(g.id) + '">' + html(g.name) + ' (' + g.size + ')</option>').join('');
         if (keep) sel.value = keep;
       }
@@ -364,6 +364,7 @@
       CLONE_IDS.forEach((n, i) => {
         const p = pairs[i] || {};
         if (p.from) el('clone-from-' + n).value = p.from;
+        if (p.from2) el('clone-from2-' + n).value = p.from2;
         if (p.to) el('clone-to-' + n).value = p.to;
         el('clone-on-' + n).checked = p.enabled === true;
         if (p.enabled) anyOn = true;
@@ -384,7 +385,7 @@
     try {
       const r = await fetch('/api/wa/clone', {method: 'POST', headers: {'content-type': 'application/json'},
         body: JSON.stringify({pairs: CLONE_IDS.map(n => ({id: 'p' + n,
-          from: el('clone-from-' + n).value, to: el('clone-to-' + n).value, enabled: el('clone-on-' + n).checked}))})});
+          from: el('clone-from-' + n).value, from2: el('clone-from2-' + n).value, to: el('clone-to-' + n).value, enabled: el('clone-on-' + n).checked}))})});
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha.');
       const on = (d.pairs || []).filter(p => p.enabled).length;

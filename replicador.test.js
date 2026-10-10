@@ -74,3 +74,28 @@ test('pares independentes: cada origem vai ao próprio destino',()=>{
   assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000003@g.us'},message:{conversation:'oi'}},cfg),null);
   assert.deepEqual(matchPairs({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{}},cfg).map(p=>p.id),['p1']);
 });
+test('duas origens por par: ambas vão para o mesmo destino',()=>{
+  const cfg={pairs:[
+    {id:'p1',from:'120363000001@g.us',from2:'120363000003@g.us',to:'120363000002@g.us',enabled:true},
+  ]};
+  const a=shouldClone({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{conversation:'oi'}},cfg);
+  const b=shouldClone({key:{fromMe:false,remoteJid:'120363000003@g.us'},message:{conversation:'oi'}},cfg);
+  assert.equal(a.to,'120363000002@g.us');
+  assert.equal(b.to,'120363000002@g.us');
+  assert.deepEqual([a.pairId,b.pairId],['p1','p1']);
+  assert.equal(matchPairs({key:{fromMe:false,remoteJid:'120363000003@g.us'},message:{}},cfg).length,1);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000009@g.us'},message:{conversation:'oi'}},cfg),null);
+});
+test('origem 2 igual à 1 ou ao destino é descartada',()=>{
+  const cfg={pairs:[
+    {id:'p1',from:'120363000001@g.us',from2:'120363000001@g.us',to:'120363000002@g.us',enabled:true},
+  ]};
+  assert.equal(matchPairs({key:{fromMe:false,remoteJid:'120363000001@g.us'},message:{}},cfg).length,1);
+  const bad={pairs:[{id:'p1',from:'120363000001@g.us',from2:'120363000002@g.us',to:'120363000002@g.us',enabled:true}]};
+  assert.equal(matchPairs({key:{fromMe:false,remoteJid:'120363000002@g.us'},message:{}},bad).length,0);
+});
+test('par ligado sem nenhuma origem fica desligado',()=>{
+  const cfg={pairs:[{id:'p1',from:'',from2:'',to:'120363000002@g.us',enabled:true}]};
+  assert.equal(matchPairs({key:{fromMe:false,remoteJid:'x'},message:{}},cfg).length,0);
+  assert.equal(shouldClone({key:{fromMe:false,remoteJid:'120363000002@g.us'},message:{conversation:'oi'}},cfg),null);
+});

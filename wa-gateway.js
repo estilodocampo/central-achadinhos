@@ -185,8 +185,11 @@ const MAX_PAIRS = 4;
 function cleanPair(p, i) {
   const id = String(p?.id || "p" + (i + 1)).slice(0, 12);
   const from = isGroupJid(p?.from) ? String(p.from) : "";
+  let from2 = isGroupJid(p?.from2) ? String(p.from2) : "";
   const to = isGroupJid(p?.to) ? String(p.to) : "";
-  return {id, from, to, enabled: p?.enabled === true && Boolean(from && to && from !== to),
+  if (from2 === from || from2 === to) from2 = "";
+  const okTargets = Boolean(to && (from || from2) && to !== from && to !== from2);
+  return {id, from, from2, to, enabled: p?.enabled === true && okTargets,
     cloned: Number(p?.cloned) || 0, lastAt: Number(p?.lastAt) || 0};
 }
 let cloneLoaded = false;
@@ -221,7 +224,7 @@ function asPairs(cfg) {
   return [];
 }
 function saveClone() {
-  setCfg("clone", {pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt})),
+  setCfg("clone", {pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, from2: p.from2, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt})),
     aff: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord, shopeeConvert: clone.aff.shopeeConvert,
       shopeeId: clone.aff.shopeeId, shopeeSecret: clone.aff.shopeeSecret}}).catch(() => {});
 }
@@ -232,7 +235,8 @@ export function shouldClone(msg, cfg) {
   const key = msg.key || {};
   if (key.fromMe) return null;
   const pairs = asPairs(cfg).map((p, i) => cleanPair(p, i)).filter((p) => p.enabled);
-  const pair = pairs.find((p) => String(key.remoteJid || "") === p.from);
+  const jid = String(key.remoteJid || "");
+  const pair = pairs.find((p) => jid === p.from || (p.from2 && jid === p.from2));
   if (!pair) return null;
   const m = msg.message || {};
   if (m.protocolMessage || m.reactionMessage || m.pollCreationMessage) return null;
@@ -249,8 +253,9 @@ export function shouldClone(msg, cfg) {
 export function matchPairs(msg, cfg) {
   if (!msg || typeof msg !== "object" || msg.key?.fromMe) return [];
   const jid = String(msg.key?.remoteJid || "");
+  if (!jid) return [];
   return asPairs(cfg).map((p, i) => cleanPair(p, i))
-    .filter((p) => p.enabled && jid === p.from);
+    .filter((p) => p.enabled && (jid === p.from || (p.from2 && jid === p.from2)));
 }
 async function handleIncoming(upsert) {
   await loadClone();
@@ -370,9 +375,10 @@ export async function setClone({from, to, enabled, affiliate, pairs}) {
     }
     const cleaned = pairs.map((p, i) => cleanPair(p, i));
     for (const p of cleaned) {
-      if (p.enabled && (!p.from || !p.to)) throw Error("Par '" + p.id + "': escolha origem e destino.");
-      if (p.enabled && p.from === p.to) throw Error("Par '" + p.id + "': origem e destino precisam ser diferentes.");
-      const prev = clone.pairs.find((x) => x.id === p.id && x.from === p.from && x.to === p.to);
+      if (p.enabled && (!p.from && !p.from2)) throw Error("Par '" + p.id + "': escolha ao menos 1 origem.");
+      if (p.enabled && !p.to) throw Error("Par '" + p.id + "': escolha o destino.");
+      if (p.enabled && p.from && p.from2 && p.from === p.from2) throw Error("Par '" + p.id + "': as origens precisam ser diferentes.");
+      const prev = clone.pairs.find((x) => x.id === p.id && x.from === p.from && x.to === p.to && x.from2 === p.from2);
       if (prev) { p.cloned = prev.cloned; p.lastAt = prev.lastAt; }
     }
     clone.pairs = cleaned;
@@ -402,7 +408,7 @@ export function cloneStatus() {
     cloned: clone.pairs.reduce((n, p) => n + (p.cloned || 0), 0),
     lastAt: clone.pairs.reduce((m, p) => Math.max(m, p.lastAt || 0), 0) || null,
     lastError: clone.lastError || null,
-    pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt || null})),
+    pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, from2: p.from2, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt || null})),
     affiliate: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord,
       shopeeConvert: clone.aff.shopeeConvert, hasShopee: Boolean(clone.aff.shopeeId && clone.aff.shopeeSecret)}};
 }

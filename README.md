@@ -1,4 +1,4 @@
-# Central de Achadinhos — Replicador v1.9.0 (modo comercial)
+# Central de Achadinhos — Replicador v1.10.0 (modo comercial)
 
 Replique anúncios de afiliados (Shopee, Mercado Livre, TikTok Shop) nos seus grupos de WhatsApp. **Ofertas e mensagens nunca são salvas** — cada cliente conecta as próprias contas no painel.
 
