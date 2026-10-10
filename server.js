@@ -11,7 +11,7 @@
   const { dirname, resolve, extname, sep } = await import('node:path');
   const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'public');
   const PORT=Number(process.env.PORT||3000);
-  const VERSION='1.10.0';
+  const VERSION='1.11.0';
   const MARKETS=['shopee.com.br','shopee.com','shope.ee','mercadolivre.com.br','mercadolivre.com','mercadolibre.com','meli.la','tiktok.com','tiktokshop.com'];
   function marketUrl(input) {
     const u=new URL(input);

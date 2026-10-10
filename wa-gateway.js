@@ -182,15 +182,34 @@ export function startWhatsApp() {
 const clone = {pairs: [], lastError: "",
   aff: {mlTool: "", mlWord: "", shopeeConvert: false, shopeeId: "", shopeeSecret: ""}};
 const MAX_PAIRS = 4;
+const MAX_DESTS = 4;
 function cleanPair(p, i) {
   const id = String(p?.id || "p" + (i + 1)).slice(0, 12);
   const from = isGroupJid(p?.from) ? String(p.from) : "";
   let from2 = isGroupJid(p?.from2) ? String(p.from2) : "";
-  const to = isGroupJid(p?.to) ? String(p.to) : "";
-  if (from2 === from || from2 === to) from2 = "";
-  const okTargets = Boolean(to && (from || from2) && to !== from && to !== from2);
-  return {id, from, from2, to, enabled: p?.enabled === true && okTargets,
+  const hub = isGroupJid(p?.hub) ? String(p.hub) : "";
+  const fromAll = p?.fromAll === true;
+  // Grupo 3 (vários destinos). Aceita legado {to} único.
+  let dests = [];
+  if (Array.isArray(p?.dests)) dests = p.dests.map((x) => (isGroupJid(x) ? String(x) : "")).filter(Boolean);
+  else if (isGroupJid(p?.to)) dests = [String(p.to)];
+  // Destino nunca pode ser origem (evita auto-loop).
+  dests = [...new Set(dests)].filter((d) => d !== from && d !== from2).slice(0, MAX_DESTS);
+  if (from2 === from || from2 === hub) from2 = "";
+  const hasOrigin = fromAll ? true : Boolean(from || from2 || hub);
+  // Precisa de pelo menos 1 destino. Hub pode ser o único se também for o ponto de chegada? Não: hub+≥1 destino.
+  const okTargets = Boolean(dests.length) && hasOrigin;
+  return {id, from, from2, fromAll, hub, dests, enabled: p?.enabled === true && okTargets,
     cloned: Number(p?.cloned) || 0, lastAt: Number(p?.lastAt) || 0};
+}
+// Destinos finais de um par: Grupo 2 (distribuidor) + Grupo 3 (vários), sem repetir.
+export function pairTargets(p) {
+  const seen = new Set();
+  const out = [];
+  const add = (j) => { if (j && !seen.has(j)) { seen.add(j); out.push(j); } };
+  add(p.hub);
+  for (const d of p.dests || []) add(d);
+  return out;
 }
 let cloneLoaded = false;
 async function loadClone() {
@@ -220,27 +239,29 @@ async function loadClone() {
 function asPairs(cfg) {
   if (!cfg || typeof cfg !== "object") return [];
   if (Array.isArray(cfg.pairs)) return cfg.pairs;
-  if (cfg.from || cfg.to) return [{id: "p1", from: cfg.from, to: cfg.to, enabled: cfg.enabled}];
+  if (cfg.from || cfg.to) {
+    const dests = cfg.to ? [cfg.to] : [];
+    return [{id: "p1", from: cfg.from, from2: cfg.from2, fromAll: cfg.fromAll, hub: "", dests, enabled: cfg.enabled}];
+  }
   return [];
 }
 function saveClone() {
-  setCfg("clone", {pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, from2: p.from2, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt})),
+  setCfg("clone", {pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, from2: p.from2, fromAll: p.fromAll, hub: p.hub, dests: p.dests, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt})),
     aff: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord, shopeeConvert: clone.aff.shopeeConvert,
       shopeeId: clone.aff.shopeeId, shopeeSecret: clone.aff.shopeeSecret}}).catch(() => {});
 }
 // Decisão pura/testável: só texto e foto, nunca as próprias mensagens (anti-loop).
-// Aceita config nova {pairs:[...]} ou antiga {from,to,enabled}. Devolve to+pairId.
+// Aceita config nova {pairs:[...]} ou antiga {from,to,enabled}.
 export function shouldClone(msg, cfg) {
   if (!msg || typeof msg !== "object") return null;
-  const key = msg.key || {};
-  if (key.fromMe) return null;
-  const pairs = asPairs(cfg).map((p, i) => cleanPair(p, i)).filter((p) => p.enabled);
-  const jid = String(key.remoteJid || "");
-  const pair = pairs.find((p) => jid === p.from || (p.from2 && jid === p.from2));
-  if (!pair) return null;
+  if (msg.key?.fromMe) return null;
+  const pairs = matchPairs(msg, cfg);
+  if (!pairs.length) return null;
   const m = msg.message || {};
   if (m.protocolMessage || m.reactionMessage || m.pollCreationMessage) return null;
-  const base = {to: pair.to, pairId: pair.id};
+  // Alvos da primeira parada (ordem: distribuidor + destinos).
+  const targets = pairTargets(pairs[0]);
+  const base = {targets, pairId: pairs[0].id};
   if (typeof m.conversation === "string" && m.conversation.trim()) return {kind: "text", text: m.conversation, ...base};
   const ext = m.extendedTextMessage;
   if (ext && typeof ext.text === "string" && ext.text.trim()) return {kind: "text", text: ext.text, ...base};
@@ -249,13 +270,23 @@ export function shouldClone(msg, cfg) {
   }
   return null;
 }
-// Todos os pares que casam com a mensagem (independentes entre si).
+// Pares que casam com a origem da mensagem (independentes entre si).
+// fromAll = todos os grupos são origem, EXCETO hub/destinos de todos os pares (anti-loop).
 export function matchPairs(msg, cfg) {
   if (!msg || typeof msg !== "object" || msg.key?.fromMe) return [];
   const jid = String(msg.key?.remoteJid || "");
   if (!jid) return [];
-  return asPairs(cfg).map((p, i) => cleanPair(p, i))
-    .filter((p) => p.enabled && (jid === p.from || (p.from2 && jid === p.from2)));
+  const enabled = asPairs(cfg).map((p, i) => cleanPair(p, i)).filter((p) => p.enabled);
+  const protectedJids = new Set();
+  for (const p of enabled) { if (p.hub) protectedJids.add(p.hub); for (const d of p.dests) protectedJids.add(d); }
+  const out = [];
+  for (const p of enabled) {
+    const match = p.fromAll
+      ? !protectedJids.has(jid)
+      : (jid === p.from || (p.from2 && jid === p.from2));
+    if (match) out.push(p);
+  }
+  return out;
 }
 async function handleIncoming(upsert) {
   await loadClone();
@@ -269,17 +300,24 @@ async function handleIncoming(upsert) {
     if (ts && Date.now() / 1000 - ts > 600) continue;
     const job = shouldClone(msg, {pairs: clone.pairs});
     if (!job) continue;
+    // Une os alvos de todos os pares que casaram (sem repetir destino).
+    const targets = [];
+    const seen = new Set();
+    const matched = matchPairs(msg, {pairs: clone.pairs});
+    for (const p of matched) for (const t of pairTargets(p)) if (!seen.has(t)) { seen.add(t); targets.push(t); }
     try {
+      let payload;
       if (job.kind === "image") {
         const buf = await sock.downloadMediaMessage(msg, "buffer", {});
-        const caption = (await applyAffiliateToText(job.caption, clone.aff)).text;
-        await sock.sendMessage(job.to, {image: buf, caption});
+        payload = {image: buf, caption: (await applyAffiliateToText(job.caption, clone.aff)).text};
       } else {
-        const text = (await applyAffiliateToText(job.text, clone.aff)).text;
-        await sock.sendMessage(job.to, {text});
+        payload = {text: (await applyAffiliateToText(job.text, clone.aff)).text};
       }
-      const pair = clone.pairs.find((p) => p.id === job.pairId);
-      if (pair) { pair.cloned++; pair.lastAt = Date.now(); }
+      for (const jid of targets) {
+        await sock.sendMessage(jid, payload);
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      for (const pair of matched) { pair.cloned++; pair.lastAt = Date.now(); }
       clone.lastError = "";
       saveClone();
     } catch {
@@ -375,10 +413,14 @@ export async function setClone({from, to, enabled, affiliate, pairs}) {
     }
     const cleaned = pairs.map((p, i) => cleanPair(p, i));
     for (const p of cleaned) {
-      if (p.enabled && (!p.from && !p.from2)) throw Error("Par '" + p.id + "': escolha ao menos 1 origem.");
-      if (p.enabled && !p.to) throw Error("Par '" + p.id + "': escolha o destino.");
-      if (p.enabled && p.from && p.from2 && p.from === p.from2) throw Error("Par '" + p.id + "': as origens precisam ser diferentes.");
-      const prev = clone.pairs.find((x) => x.id === p.id && x.from === p.from && x.to === p.to && x.from2 === p.from2);
+      if (!p.enabled) continue;
+      const hasOrigin = p.fromAll || p.from || p.from2;
+      if (!hasOrigin) throw Error("Par '" + p.id + "': escolha a origem (Grupo 1) ou marque Todos os grupos.");
+      if (!p.dests.length) throw Error("Par '" + p.id + "': escolha ao menos 1 destino (Grupo 3).");
+      if (!p.fromAll && p.from && p.from2 && p.from === p.from2) throw Error("Par '" + p.id + "': as origens precisam ser diferentes.");
+      const prev = clone.pairs.find((x) => x.id === p.id && x.from === p.from && x.hub === p.hub
+        && x.from2 === p.from2 && x.fromAll === p.fromAll
+        && (x.dests || []).slice().sort().join("|") === (p.dests || []).slice().sort().join("|"));
       if (prev) { p.cloned = prev.cloned; p.lastAt = prev.lastAt; }
     }
     clone.pairs = cleaned;
@@ -386,16 +428,16 @@ export async function setClone({from, to, enabled, affiliate, pairs}) {
     // Compat: par único vira/atualiza o primeiro par, sem mexer nos demais.
     const f = String(from || "").trim(), t = String(to || "").trim();
     let p1 = clone.pairs.find((p) => p.id === "p1");
-    if (!p1) { p1 = {id: "p1", from: "", to: "", enabled: false, cloned: 0, lastAt: 0}; clone.pairs.unshift(p1); }
+    if (!p1) { p1 = {id: "p1", from: "", from2: "", fromAll: false, hub: "", dests: [], enabled: false, cloned: 0, lastAt: 0}; clone.pairs.unshift(p1); }
     if (enabled === true) {
       if (!isGroupJid(f) || !isGroupJid(t)) throw Error("Escolha grupos válidos.");
       if (f === t) throw Error("Origem e destino precisam ser grupos diferentes.");
-      if (p1.from !== f || p1.to !== t) { p1.cloned = 0; p1.lastAt = 0; }
-      p1.from = f; p1.to = t; p1.enabled = true;
+      if (p1.from !== f || (p1.dests || [])[0] !== t) { p1.cloned = 0; p1.lastAt = 0; }
+      p1.from = f; p1.hub = ""; p1.dests = [t]; p1.enabled = true;
     } else if (enabled === false) {
       p1.enabled = false;
       if (f) p1.from = f;
-      if (t) p1.to = t;
+      if (t) p1.dests = [t];
     }
     clone.pairs = clone.pairs.slice(0, MAX_PAIRS);
   }
@@ -404,11 +446,12 @@ export async function setClone({from, to, enabled, affiliate, pairs}) {
 }
 export function cloneStatus() {
   return {enabled: clone.pairs.some((p) => p.enabled),
-    from: clone.pairs[0]?.from || "", to: clone.pairs[0]?.to || "",
+    from: clone.pairs[0]?.from || "",
+    to: clone.pairs[0]?.dests?.[0] || clone.pairs[0]?.hub || "",
     cloned: clone.pairs.reduce((n, p) => n + (p.cloned || 0), 0),
     lastAt: clone.pairs.reduce((m, p) => Math.max(m, p.lastAt || 0), 0) || null,
     lastError: clone.lastError || null,
-    pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, from2: p.from2, to: p.to, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt || null})),
+    pairs: clone.pairs.map((p) => ({id: p.id, from: p.from, from2: p.from2, fromAll: p.fromAll, hub: p.hub, dests: p.dests, enabled: p.enabled, cloned: p.cloned, lastAt: p.lastAt || null})),
     affiliate: {mlTool: clone.aff.mlTool, mlWord: clone.aff.mlWord,
       shopeeConvert: clone.aff.shopeeConvert, hasShopee: Boolean(clone.aff.shopeeId && clone.aff.shopeeSecret)}};
 }

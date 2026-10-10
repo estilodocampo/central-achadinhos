@@ -334,20 +334,44 @@
   el('select-none').addEventListener('click', () => document.querySelectorAll('[data-group]').forEach(i => i.checked = false));
   el('send-btn').addEventListener('click', sendNow);
   const CLONE_IDS = [1, 2];
+  const CLONE_DEST_SLOTS = 4;
+  function cloneGroupOptions(groups, emptyLabel) {
+    return '<option value="">' + emptyLabel + '</option>' + groups.map(g =>
+      '<option value="' + html(g.id) + '">' + html(g.name) + ' (' + g.size + ')</option>').join('');
+  }
   function fillCloneSelects(groups) {
     for (const n of CLONE_IDS) {
-      for (const id of ['clone-from-' + n, 'clone-from2-' + n, 'clone-to-' + n]) {
+      const destBox = el('clone-dests-' + n);
+      if (destBox && !destBox.dataset.built) {
+        let out = '';
+        for (let s = 1; s <= CLONE_DEST_SLOTS; s++) {
+          out += '<label class="field"><span>Destino ' + s + '</span><select id="clone-dest-' + n + '-' + s + '"></select></label>';
+        }
+        destBox.innerHTML = out;
+        destBox.dataset.built = '1';
+      }
+      for (const id of ['clone-from-' + n, 'clone-from2-' + n]) {
         const sel = el(id);
-        if (!sel) continue;
-        const keep = sel.value;
-        sel.innerHTML = '<option value="">' + (id.startsWith('clone-from2') ? 'Nenhuma' : 'Escolha o grupo…') + '</option>' + groups.map(g =>
-          '<option value="' + html(g.id) + '">' + html(g.name) + ' (' + g.size + ')</option>').join('');
-        if (keep) sel.value = keep;
+        if (sel) sel.innerHTML = cloneGroupOptions(groups, id.includes('from2') ? 'Nenhuma' : 'Escolha o grupo…');
+      }
+      const hub = el('clone-hub-' + n);
+      if (hub) hub.innerHTML = cloneGroupOptions(groups, 'Nenhum');
+      for (let s = 1; s <= CLONE_DEST_SLOTS; s++) {
+        const sel = el('clone-dest-' + n + '-' + s);
+        if (sel) sel.innerHTML = cloneGroupOptions(groups, s === 1 ? 'Escolha o grupo…' : 'Nenhum');
       }
     }
   }
   function groupName(groups, id) {
     return ((groups || []).find(x => x.id === id) || {}).name || id;
+  }
+  function toggleAllSources(n) {
+    const on = el('clone-all-' + n)?.checked === true;
+    const box = el('clone-src-' + n);
+    if (box) box.classList.toggle('src-locked', on);
+    ['clone-from-' + n, 'clone-from2-' + n].forEach(id => { if (el(id)) el(id).disabled = on; });
+    const note = el('clone-all-note-' + n);
+    if (note) note.textContent = on ? 'Origem: todos os grupos do WhatsApp conectado' : '';
   }
   async function refreshClone() {
     const st = el('clone-status');
@@ -358,15 +382,22 @@
       ]);
       fillCloneSelects(g.groups || []);
       const pairs = Array.isArray(c.pairs) && c.pairs.length ? c.pairs : [{}, {}];
-      // Compat: resposta antiga de par único.
-      if (!Array.isArray(c.pairs) && (c.from || c.to)) pairs[0] = {from: c.from, to: c.to, enabled: c.enabled, cloned: c.cloned};
+      // Compat: resposta antiga de par único (to = 1 destino).
+      if (!Array.isArray(c.pairs) && (c.from || c.to)) pairs[0] = {from: c.from, dests: c.to ? [c.to] : [], enabled: c.enabled, cloned: c.cloned};
       let anyOn = false;
       CLONE_IDS.forEach((n, i) => {
         const p = pairs[i] || {};
         if (p.from) el('clone-from-' + n).value = p.from;
         if (p.from2) el('clone-from2-' + n).value = p.from2;
-        if (p.to) el('clone-to-' + n).value = p.to;
+        el('clone-all-' + n).checked = p.fromAll === true;
+        if (p.hub) el('clone-hub-' + n).value = p.hub;
+        const dests = Array.isArray(p.dests) ? p.dests : (p.to ? [p.to] : []);
+        for (let s = 1; s <= CLONE_DEST_SLOTS; s++) {
+          const sel = el('clone-dest-' + n + '-' + s);
+          if (sel) sel.value = dests[s - 1] || '';
+        }
         el('clone-on-' + n).checked = p.enabled === true;
+        toggleAllSources(n);
         if (p.enabled) anyOn = true;
         el('clone-stats-' + n).textContent = p.enabled
           ? ('Ligado • ' + (p.cloned || 0) + ' replicadas')
@@ -381,11 +412,19 @@
       st.textContent = anyOn ? 'Clonagem ativa.' : 'Tudo desligado. Configure um par, ligue e salve.';
     } catch { st.textContent = 'Não foi possível carregar.'; }
   }
+  CLONE_IDS.forEach(n => el('clone-all-' + n)?.addEventListener('change', () => toggleAllSources(n)));
   el('clone-save').addEventListener('click', async () => {
     try {
-      const r = await fetch('/api/wa/clone', {method: 'POST', headers: {'content-type': 'application/json'},
-        body: JSON.stringify({pairs: CLONE_IDS.map(n => ({id: 'p' + n,
-          from: el('clone-from-' + n).value, from2: el('clone-from2-' + n).value, to: el('clone-to-' + n).value, enabled: el('clone-on-' + n).checked}))})});
+      const payload = {pairs: CLONE_IDS.map(n => ({
+        id: 'p' + n,
+        from: el('clone-from-' + n).value,
+        from2: el('clone-from2-' + n).value,
+        fromAll: el('clone-all-' + n).checked,
+        hub: el('clone-hub-' + n).value,
+        dests: Array.from({length: CLONE_DEST_SLOTS}, (_, i) => el('clone-dest-' + n + '-' + (i + 1)).value).filter(Boolean),
+        enabled: el('clone-on-' + n).checked
+      }))};
+      const r = await fetch('/api/wa/clone', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload)});
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Falha.');
       const on = (d.pairs || []).filter(p => p.enabled).length;

@@ -38,3 +38,6 @@
 .clone-pair h3 small{font-weight:400;font-size:11px;color:#84909d}
 .switch{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#172337;cursor:pointer;white-space:nowrap}
 .switch input{width:20px;height:20px;accent-color:#18936d;cursor:pointer}
+
+
+.clone-dest-title{font-size:12px;font-weight:800;letter-spacing:.4px;color:#84909d;margin:6px 2px 2px;text-transform:uppercase}
