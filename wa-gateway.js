@@ -182,6 +182,7 @@ export function startWhatsApp() {
 const clone = {pairs: [], lastError: "",
   aff: {mlTool: "", mlWord: "", shopeeConvert: false, shopeeId: "", shopeeSecret: ""}};
 const cloneDiag = {upserts: 0, seen: 0, fromMe: 0, old: 0, notReady: 0, noEnabled: 0, nomatch: 0, matched: 0, sent: 0, lastJid: "", lastType: "", lastMatch: "", lastErr: ""};
+const cloneSeen = new Set();
 const MAX_PAIRS = 4;
 const MAX_DESTS = 20;
 function cleanPair(p, i) {
@@ -301,6 +302,11 @@ async function handleIncoming(upsert) {
     diag.lastJid = String(msg?.key?.remoteJid || "");
     diag.lastType = String((upsert?.type) || "");
     if (msg?.key?.fromMe) { diag.fromMe++; continue; }
+    // Anti-duplicação por sessão (mesma mensagem não replica 2x).
+    const mkey = String(msg?.key?.remoteJid || "") + ":" + String(msg?.key?.id || "");
+    if (cloneSeen.has(mkey)) continue;
+    cloneSeen.add(mkey);
+    if (cloneSeen.size > 800) cloneSeen.delete(cloneSeen.values().next().value);
     // Ignora histórico antigo: só mensagens dos últimos 10 min.
     const ts = Number(msg?.messageTimestamp) || 0;
     if (ts && Date.now() / 1000 - ts > 600) { diag.old++; continue; }

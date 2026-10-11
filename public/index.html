@@ -20,7 +20,7 @@
       <button class="nav-btn" data-step="3"><span class="nav-emoji">↗</span> 3. Grupos</button>
       <button class="nav-btn" data-step="4"><span class="nav-emoji">🔁</span> 4. Clonador</button>
     </nav>
-    <div class="sidebar-bottom"><span class="online-dot"></span> Replicador <span class="ver">v1.12.0</span><p>Nada é salvo. Conecte o WhatsApp, monte a mensagem e replique.</p></div>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Replicador <span class="ver">v1.13.0</span><p>Nada é salvo. Conecte o WhatsApp, monte a mensagem e replique.</p></div>
   </aside>
 
   <main class="main-content">
@@ -111,9 +111,9 @@
         <div class="panel-head"><div><h3>Par 1</h3><p id="clone-stats-1"></p></div><label class="switch"><input type="checkbox" id="clone-on-1"><span>Ligado</span></label></div>
         <label class="publish-item"><input type="checkbox" id="clone-all-1" class="clone-all"> <div><h4>Grupo 1 = todos os grupos</h4><p>Origem: todos os grupos do WhatsApp conectado</p></div></label>
         <div id="clone-src-1">
-          <div class="form-row"><label class="field"><span>Grupo 1 (origem)</span><select id="clone-from-1"><option value="">Escolha o grupo…</option></select></label><label class="field"><span>Origem 2 <small>opcional</small></span><select id="clone-from2-1"><option value="">Nenhuma</option></select></label></div>
-          <div class="form-row"><label class="field"><span>Grupo 2 (Distribuidor)</span><select id="clone-hub-1"><option value="">Nenhum</option></select></label></div>
-          <div class="clone-dest-title"><span>Grupo 3 (destinos)</span></div>
+          <div class="form-row"><label class="field"><span>Origem (de onde vêm as ofertas)</span><select id="clone-from-1"><option value="">Escolha o grupo…</option></select></label><label class="field"><span>Origem 2 <small>opcional</small></span><select id="clone-from2-1"><option value="">Nenhuma</option></select></label></div>
+          <div class="form-row"><label class="field"><span>Meu grupo Distribuidor</span><select id="clone-hub-1"><option value="">Nenhum</option></select></label></div>
+          <div class="clone-dest-title"><span>Demais grupos (destinos)</span></div>
           <div class="dest-picker">
           <div class="dest-bar"><input type="search" id="destq-1" placeholder="Buscar destino…" aria-label="Buscar destino"><button type="button" id="destall-1">Todos</button><button type="button" id="destnone-1">Nenhum</button></div>
           <div class="publish-list dest-list" id="clone-destlist-1"></div>
@@ -125,9 +125,9 @@
         <div class="panel-head"><div><h3>Par 2 <small>independente</small></h3><p id="clone-stats-2"></p></div><label class="switch"><input type="checkbox" id="clone-on-2"><span>Ligado</span></label></div>
         <label class="publish-item"><input type="checkbox" id="clone-all-2" class="clone-all"> <div><h4>Grupo 1 = todos os grupos</h4><p>Origem: todos os grupos do WhatsApp conectado</p></div></label>
         <div id="clone-src-2">
-          <div class="form-row"><label class="field"><span>Grupo 1 (origem)</span><select id="clone-from-2"><option value="">Escolha o grupo…</option></select></label><label class="field"><span>Origem 2 <small>opcional</small></span><select id="clone-from2-2"><option value="">Nenhuma</option></select></label></div>
-          <div class="form-row"><label class="field"><span>Grupo 2 (Distribuidor)</span><select id="clone-hub-2"><option value="">Nenhum</option></select></label></div>
-          <div class="clone-dest-title"><span>Grupo 3 (destinos)</span></div>
+          <div class="form-row"><label class="field"><span>Origem (de onde vêm as ofertas)</span><select id="clone-from-2"><option value="">Escolha o grupo…</option></select></label><label class="field"><span>Origem 2 <small>opcional</small></span><select id="clone-from2-2"><option value="">Nenhuma</option></select></label></div>
+          <div class="form-row"><label class="field"><span>Meu grupo Distribuidor</span><select id="clone-hub-2"><option value="">Nenhum</option></select></label></div>
+          <div class="clone-dest-title"><span>Demais grupos (destinos)</span></div>
           <div class="dest-picker">
           <div class="dest-bar"><input type="search" id="destq-2" placeholder="Buscar destino…" aria-label="Buscar destino"><button type="button" id="destall-2">Todos</button><button type="button" id="destnone-2">Nenhum</button></div>
           <div class="publish-list dest-list" id="clone-destlist-2"></div>
@@ -142,7 +142,7 @@
       <div class="composer-actions"><button type="button" id="aff-save" class="btn btn-primary">Salvar meus links</button></div>
       <p class="tiny-warning">Anti-loop: ignora as próprias mensagens e só vale para grupos diferentes. A config sobrevive a reinícios; mensagens nunca são salvas.</p>
     </section>
-    <footer class="footer">Replicador <b>v1.12</b> <span>•</span> Nada é salvo. Painel independente.</footer>
+    <footer class="footer">Replicador <b>v1.13</b> <span>•</span> Nada é salvo. Painel independente.</footer>
   </main>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
